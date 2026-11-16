@@ -1,0 +1,88 @@
+import { Router } from "express";
+import { z } from "zod";
+import { supabase } from "../lib/supabase.js";
+
+const router = Router();
+
+const bookingSchema = z.object({
+  service: z.enum([
+    "residential", "deep", "move", "commercial", "other"
+  ]),
+  property: z.string().trim().min(1),
+  address: z.string().trim().min(5),
+  bedrooms: z.string(),
+  bathrooms: z.string(),
+  date: z.iso.date(),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  hours: z.coerce.number().int().min(1).max(24),
+  cleaners: z.coerce.number().int().min(1).max(20),
+  pets: z.enum(["yes", "no"]),
+  supplies: z.enum(["customer", "company"]),
+  notes: z.string().max(2000).optional().default(""),
+  name: z.string().trim().min(2),
+  email: z.email(),
+  phone: z.string().trim().min(7)
+});
+
+router.post("/", async (req, res) => {
+  const parsed = bookingSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid booking details",
+      details: z.flattenError(parsed.error)
+    });
+  }
+
+  const b = parsed.data;
+
+  try {
+    const { data, error } = await supabase
+      .from("bookings")
+      .insert({
+        service: b.service,
+        property: b.property,
+        address: b.address,
+        bedrooms: b.bedrooms,
+        bathrooms: b.bathrooms,
+        service_date: b.date,
+        service_time: b.time,
+        hours: b.hours,
+        cleaners: b.cleaners,
+        pets: b.pets,
+        supplies: b.supplies,
+        notes: b.notes,
+        customer_name: b.name,
+        customer_email: b.email,
+        customer_phone: b.phone
+      })
+      .select("booking_code, status")
+      .single();
+
+    if (error) {
+      console.error("Supabase booking error:", error.message);
+
+      return res.status(500).json({
+        success: false,
+        error: "Unable to save booking"
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      bookingCode: data.booking_code,
+      status: data.status,
+      message: "Booking saved successfully"
+    });
+  } catch (error) {
+    console.error("Booking request failed:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Booking service unavailable"
+    });
+  }
+});
+
+export default router;

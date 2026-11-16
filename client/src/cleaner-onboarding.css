@@ -1,0 +1,9 @@
+/* Import this in App.jsx, or copy rules to index.css. */
+.join-form .join-consent{display:flex;flex-direction:row;align-items:flex-start;gap:10px;line-height:1.5}
+.join-form .join-consent input{width:18px;height:18px;min-height:18px;flex:0 0 18px;margin:2px 0 0}
+.join-form input[type="file"]{max-width:100%;min-width:0}
+
+.join-disclosures{max-height:220px;overflow:auto;border:1px solid #d9e6dd;border-radius:10px;padding:12px;font-size:13px;line-height:1.55;background:#f8fbf9}
+.join-disclosures p{margin:6px 0 12px}
+
+.cleaner-portal{min-height:100vh;background:#f3f8f5;display:flex;align-items:flex-start;justify-content:center;padding:5rem 1rem}.cleaner-portal-card{background:white;max-width:720px;width:100%;padding:2rem;border-radius:18px;box-shadow:0 12px 40px #16362618}.cleaner-portal-card h1{margin:2rem 0 1rem}.cleaner-portal-card form{display:grid;gap:1rem}.cleaner-admin-list{display:grid;gap:1rem;margin-top:1rem}.cleaner-admin-list article{padding:1rem;border:1px solid #dbe8df;border-radius:12px}.cleaner-admin-list p{overflow-wrap:anywhere;margin:.4rem 0}
