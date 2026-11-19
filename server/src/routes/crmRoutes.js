@@ -22,13 +22,39 @@ function fail(res,error,context){console.error('CRM '+context,error?.message||er
 router.get('/overview',async(_req,res)=>{
  const [bookings,cleaners]=await Promise.all([
   supabase.from('bookings').select('id,booking_code,customer_name,customer_email,customer_phone,address,service,service_date,service_time,hours,cleaners,notes,estimated_total,status,crm_payment_status,crm_tags,crm_assigned_cleaner_id,created_at').order('created_at',{ascending:false}).limit(500),
-  supabase.from('cleaner_profiles').select('id,cleaner_code,first_name,last_name,email,phone,city,specialty,years_experience,verification_status,auth_user_id,crm_tags,created_at').order('created_at',{ascending:false}).limit(500)
+  supabase.from('cleaner_profiles').select('id,cleaner_code,first_name,last_name,email,phone,city,specialty,years_experience,verification_status,auth_user_id,profile_photo_path,crm_tags,created_at').order('created_at',{ascending:false}).limit(500)
  ]);
  if(bookings.error)return fail(res,bookings.error,'load bookings');if(cleaners.error)return fail(res,cleaners.error,'load cleaners');
  const customerMap=new Map();
  for(const b of bookings.data){const key=(b.customer_email||'').trim().toLowerCase();if(!key)continue;const old=customerMap.get(key)||{email:key,name:b.customer_name,phone:b.customer_phone,bookings:0,totalEstimated:0,lastBooking:null};old.bookings++;old.totalEstimated+=Number(b.estimated_total||0);if(!old.lastBooking||b.created_at>old.lastBooking)old.lastBooking=b.created_at;customerMap.set(key,old);}
  return res.json({bookings:bookings.data,cleaners:cleaners.data,customers:[...customerMap.values()],limitedTo:500});
 });
+
+// All endpoints below inherit the administrator authentication middleware.
+router.get('/cleaners/:id/photo',async(req,res)=>{
+ if(!uuid.safeParse(req.params.id).success)return res.status(400).json({error:'Invalid cleaner ID'});
+ const {data,error}=await supabase.from('cleaner_profiles').select('profile_photo_path').eq('id',req.params.id).maybeSingle();
+ if(error)return fail(res,error,'load cleaner photo');
+ if(!data)return res.status(404).json({error:'Cleaner not found'});
+ if(!data.profile_photo_path)return res.status(404).json({error:'No profile photograph on file'});
+ const signed=await supabase.storage.from('cleaner-profile-photos').createSignedUrl(data.profile_photo_path,60);
+ if(signed.error)return fail(res,signed.error,'access cleaner photo');
+ res.set('Cache-Control','no-store');return res.json({url:signed.data.signedUrl});
+});
+router.patch('/cleaners/:id/review',async(req,res)=>{
+ if(!uuid.safeParse(req.params.id).success)return res.status(400).json({error:'Invalid cleaner ID'});
+ const parsed=z.object({decision:z.enum(['approved','rejected','pending'])}).strict().safeParse(req.body);
+ if(!parsed.success)return res.status(400).json({error:'Invalid review decision'});
+ const {data:profile,error:lookupError}=await supabase.from('cleaner_profiles').select('id,profile_photo_path,verification_status').eq('id',req.params.id).maybeSingle();
+ if(lookupError)return fail(res,lookupError,'load cleaner');
+ if(!profile)return res.status(404).json({error:'Cleaner not found'});
+ if(parsed.data.decision==='approved'&&!profile.profile_photo_path)return res.status(409).json({error:'A profile photo is required before approval. Request a photo from the applicant.'});
+ const result=await supabase.from('cleaner_profiles').update({verification_status:parsed.data.decision}).eq('id',profile.id).eq('verification_status',profile.verification_status).select('id').maybeSingle();
+ if(result.error)return fail(res,result.error,'review cleaner');
+ if(!result.data)return res.status(409).json({error:'Application changed. Refresh and retry.'});
+ return res.json({success:true,verification_status:parsed.data.decision});
+});
+
 router.patch('/bookings/:id',async(req,res)=>{
  if(!uuid.safeParse(req.params.id).success)return res.status(400).json({error:'Invalid booking ID'});
  const schema=z.object({status:z.enum(allowedStatuses).optional(),paymentStatus:z.enum(allowedPayments).optional(),tags:z.array(z.string().trim().min(1).max(32)).max(15).optional()}).strict();

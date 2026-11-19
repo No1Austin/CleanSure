@@ -11,9 +11,9 @@ router.post('/register',limiter,async(req,res)=>{
  const parsed=registerSchema.safeParse(req.body);
  if(!parsed.success)return res.status(400).json({error:'Invalid registration details. Password must have at least 12 characters.'});
  const {token,cleanerId,password}=parsed.data;
- const {data:profile,error}=await supabase.from('cleaner_profiles').select('id,email,auth_user_id,invite_expires_at').eq('cleaner_code',cleanerId).eq('invite_token_hash',hash(token)).maybeSingle();
+ const {data:profile,error}=await supabase.from('cleaner_profiles').select('id,email,auth_user_id,invite_expires_at,verification_status').eq('cleaner_code',cleanerId).eq('invite_token_hash',hash(token)).maybeSingle();
  if(error)return res.status(500).json({error:'Registration temporarily unavailable.'});
- if(!profile||profile.auth_user_id||!profile.invite_expires_at||new Date(profile.invite_expires_at)<=new Date())return res.status(400).json({error:'Invitation invalid, expired, or already used.'});
+ if(!profile||profile.verification_status!=='approved'||profile.auth_user_id||!profile.invite_expires_at||new Date(profile.invite_expires_at)<=new Date())return res.status(400).json({error:'Invitation invalid, expired, or already used.'});
  // Email possession was demonstrated through the secret invitation link.
  const created=await supabase.auth.admin.createUser({email:profile.email,password,email_confirm:true,app_metadata:{account_type:'cleaner'}});
  if(created.error){console.error('Cleaner auth creation:',created.error.message);return res.status(409).json({error:'Unable to create account. Contact CleanSure support if you already have an account.'});}
@@ -62,10 +62,11 @@ router.get('/admin/bookings',auth,requireAdmin,async(req,res)=>{
 router.post('/admin/applications/:id/invitation',auth,requireAdmin,adminLimiter,async(req,res)=>{
  const id=z.string().uuid().safeParse(req.params.id);
  if(!id.success)return res.status(400).json({error:'Invalid applicant ID.'});
- const {data:profile,error}=await supabase.from('cleaner_profiles').select('id,email,first_name,cleaner_code,auth_user_id').eq('id',id.data).maybeSingle();
+ const {data:profile,error}=await supabase.from('cleaner_profiles').select('id,email,first_name,cleaner_code,auth_user_id,verification_status,profile_photo_path').eq('id',id.data).maybeSingle();
  if(error)return res.status(500).json({error:'Unable to load applicant.'});
  if(!profile)return res.status(404).json({error:'Applicant not found.'});
  if(profile.auth_user_id)return res.status(409).json({error:'This cleaner already has an account.'});
+ if(profile.verification_status!=='approved'||!profile.profile_photo_path)return res.status(409).json({error:'Approve the applicant with a profile photo before creating an invitation.'});
  const {randomBytes,createHash}=await import('node:crypto');
  const token=randomBytes(32).toString('hex');
  const tokenHash=createHash('sha256').update(token).digest('hex');

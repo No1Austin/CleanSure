@@ -44,6 +44,7 @@ router.post('/', rateLimit({windowMs:15*60*1000, limit:5, standardHeaders:'draft
   const last_name = parts.join(' ');
   const email = applicant.email.toLowerCase().trim();
   const file = req.file;
+  if (!file) return res.status(400).json({success:false,error:'A clear face photograph is required.'});
   const image = file ? detectImage(file.buffer) : null;
   if (file && (!image || file.mimetype !== image.type)) return res.status(400).json({success:false,error:'Photo must be a valid JPG, PNG, or WebP image.'});
   let path = null;
