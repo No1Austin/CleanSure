@@ -10,6 +10,10 @@ import rateLimit from "express-rate-limit";
 import "dotenv/config";
 
 const app = express();
+// Trust the known reverse proxy in production.
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
 
 app.use(helmet());
 
