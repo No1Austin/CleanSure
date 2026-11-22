@@ -1,10 +1,17 @@
 import CrmDashboard from './CrmDashboard.jsx';
+import { createClient } from '@supabase/supabase-js';
 import JobOfferPage from './JobOfferPage.jsx';
 import { useEffect, useState } from 'react';
 import { ArrowRight, Menu, X, ShieldCheck, Sparkles, Clock3, House, Building2, KeyRound, Star, CheckCircle2, Phone } from 'lucide-react';
 import './index.css';
 import './cleaner-onboarding.css';
 import './cleaner-onboarding.css';
+const recoveryClient = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true,
+    storageKey: 'cleansure-cleaner-recovery' } }
+);
 const services = [
   { icon: House, title: 'Residential Cleaning', text: 'Reliable, detailed cleaning that keeps your home feeling fresh.' },
   { icon: Sparkles, title: 'Deep Cleaning', text: 'Extra attention to the spaces that need a thorough refresh.' },
@@ -112,7 +119,7 @@ export default function App() {
 
     {priceModalOpen&&<div className="price-modal-backdrop" role="presentation"><section className="price-modal" role="dialog" aria-modal="true" aria-labelledby="price-title"><h2 id="price-title">Your estimated cleaning price</h2><p>Based on {booking.cleaners} cleaner(s), {booking.hours} hours, and {booking.supplies==='company'?'CleanSure-provided':'customer-provided'} cleaning supplies.</p><div className="price-line"><span>Rate per cleaner per hour</span><strong>{cad(rate)}</strong></div><div className="price-line"><span>Subtotal</span><strong>{cad(subtotal)}</strong></div><div className="price-line"><span>Ontario HST (13%)</span><strong>{cad(hst)}</strong></div><div className="price-line price-total"><span>Estimated total</span><strong>{cad(total)}</strong></div><p className="form-note">This is an estimate, not a payment request. We will confirm availability and any price changes with you before proceeding.</p><label className="price-accept"><input type="checkbox" checked={priceAccepted&&acceptedQuoteKey===quoteKey} onChange={e=>{setPriceAccepted(e.target.checked);setAcceptedQuoteKey(e.target.checked?quoteKey:'');}}/> I understand and accept this estimated price including HST.</label><div className="price-modal-actions"><button type="button" className="button button-secondary" onClick={()=>setPriceModalOpen(false)}>Go back</button><button type="button" className="button" disabled={!priceIsAccepted} onClick={()=>{setPriceModalOpen(false);setStep(p=>Math.max(p,2));}}>Accept and continue</button></div></section></div>}
     <section className="section team" id="team"><div className="container team-inner"><div><span className="eyebrow">WORK WITH US</span><h2>Great cleaners make great experiences.</h2><p>Join a team focused on quality, reliability, and care.</p></div><button className="button" onClick={()=>setJoinOpen(true)}>Apply to join <ArrowRight size={18}/></button></div></section>
-    {joinOpen&&<div className="modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setJoinOpen(false)}}><section className="join-modal" role="dialog" aria-modal="true" aria-labelledby="join-title"><button className="modal-x" onClick={()=>setJoinOpen(false)} aria-label="Close application"><X/></button><h2 id="join-title">Join CleanSure</h2><p>Tell us about your cleaning experience.</p><form className="join-form" onSubmit={sendJoin}><label>Full name<input name="name" autoComplete="name" maxLength="160" required/></label><label>Email<input type="email" name="email" autoComplete="email" required/></label><label>Phone number<input type="tel" name="phone" autoComplete="tel" minLength="7" required/></label><label>City / location<input name="location" autoComplete="address-level2" required/></label><label>Years of cleaning experience<input type="number" min="0" max="60" name="experience" required/></label><label>Preferred service<select name="specialty"><option>Residential cleaning</option><option>Deep cleaning</option><option>Move-in / move-out</option><option>Commercial cleaning</option></select></label><label>Clear face photo (required)<input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required/><span className="form-note">JPG, PNG or WebP, up to 3 MB. Your photo is private and reviewed by CleanSure staff.</span></label><div className="join-disclosures"><strong>Application terms</strong><p>Submitting an application does not guarantee approval, employment, or cleaning assignments. CleanSure reviews applications before permitting job acceptance. Applicants must provide accurate information and complete any required identity verification through an approved secure process before receiving assignments.</p><strong>Applicant privacy notice</strong><p>CleanSure collects your name, contact details, city, cleaning experience, service preference, and required face photograph to assess your application and contact you about onboarding. Access should be limited to authorized staff. Do not submit government ID documents in this form. For privacy questions or requests, contact CleanSure through its published support channel.</p></div><label className="join-consent"><input type="checkbox" name="consent" required/> I consent to the collection and use of my application information as described in the applicant privacy notice.</label><label className="join-consent"><input type="checkbox" name="termsAccepted" required/> I have read and accept the application terms above.</label><p className="form-note">Identity verification and secure cleaner login will be introduced during onboarding. Do not upload government identity documents here.</p><button className="button" type="submit" disabled={joinBusy}>{joinBusy?'Submitting…':'Submit application'}</button>{joinResult&&<p role="status" className="form-status">{joinResult}</p>}</form></section></div>}
+    {joinOpen&&<div className="modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setJoinOpen(false)}}><section className="join-modal" role="dialog" aria-modal="true" aria-labelledby="join-title"><button className="modal-x" onClick={()=>setJoinOpen(false)} aria-label="Close application"><X/></button><h2 id="join-title">Join CleanSure</h2><p>Tell us about your cleaning experience.</p><form className="join-form" onSubmit={sendJoin}><label>Full name<input name="name" autoComplete="name" maxLength="160" required/></label><label>Email<input type="email" name="email" autoComplete="email" required/></label><label>Phone number<input type="tel" name="phone" autoComplete="tel" minLength="7" required/></label><label>City / location<input name="location" autoComplete="address-level2" required/></label><label>Years of cleaning experience<input type="number" min="0" max="60" name="experience" required/></label><label>Preferred service<select name="specialty"><option>Residential cleaning</option><option>Deep cleaning</option><option>Move-in / move-out</option><option>Commercial cleaning</option></select></label><label>Profile photo (optional)<input type="file" name="photo" accept="image/jpeg,image/png,image/webp"/><span className="form-note">JPG, PNG or WebP, up to 3 MB. Your photo is private and reviewed by CleanSure staff.</span></label><div className="join-disclosures"><strong>Application terms</strong><p>Submitting an application does not guarantee approval, employment, or cleaning assignments. CleanSure reviews applications before permitting job acceptance. Applicants must provide accurate information and complete any required identity verification through an approved secure process before receiving assignments.</p><strong>Applicant privacy notice</strong><p>CleanSure collects your name, contact details, city, cleaning experience, service preference, and optional profile photo to assess your application and contact you about onboarding. Access should be limited to authorized staff. Do not submit government ID documents in this form. For privacy questions or requests, contact CleanSure through its published support channel.</p></div><label className="join-consent"><input type="checkbox" name="consent" required/> I consent to the collection and use of my application information as described in the applicant privacy notice.</label><label className="join-consent"><input type="checkbox" name="termsAccepted" required/> I have read and accept the application terms above.</label><p className="form-note">Identity verification and secure cleaner login will be introduced during onboarding. Do not upload government identity documents here.</p><button className="button" type="submit" disabled={joinBusy}>{joinBusy?'Submitting…':'Submit application'}</button>{joinResult&&<p role="status" className="form-status">{joinResult}</p>}</form></section></div>}
   </main>
   <footer><div className="container footer-inner"><a href="#home" className="brand">Clean<span>Sure</span></a><p>Clean Homes. Trusted Hands.</p><small>© {new Date().getFullYear()} CleanSure. All rights reserved.</small></div></footer>
  </>;
@@ -138,6 +145,49 @@ function CleanerPortal(){
  const [data,setData]=useState(null);
  const [tab,setTab]=useState('applications');
  const [draft,setDraft]=useState(null);
+ const [recoveryMode,setRecoveryMode]=useState('login');
+ const [recoveryReady,setRecoveryReady]=useState(false);
+ useEffect(()=>{
+  const query=new URLSearchParams(window.location.search);
+  const recoveryLink=query.has('cleanerResetPassword') ||
+    window.location.hash.includes('type=recovery');
+  if(!recoveryLink)return;
+  setRecoveryMode('change');
+  const {data:{subscription}}=recoveryClient.auth.onAuthStateChange((event,session)=>{
+   if(event==='PASSWORD_RECOVERY' && session)setRecoveryReady(true);
+  });
+  recoveryClient.auth.getSession().then(({data:{session}})=>{
+   if(session)setRecoveryReady(true);
+  });
+  return ()=>subscription.unsubscribe();
+ },[]);
+ async function sendPasswordReset(e){
+  e.preventDefault();setBusy(true);setMessage('');
+  try{
+   const email=new FormData(e.currentTarget).get('email');
+   const redirectTo=window.location.origin+'/?cleanerPortal=1&cleanerResetPassword=1';
+   const {error}=await recoveryClient.auth.resetPasswordForEmail(email,{redirectTo});
+   if(error)throw error;
+   setMessage('If this email has an account, a password reset link will be sent. Check your inbox and spam folder.');
+  }catch(err){setMessage(err.message)}finally{setBusy(false)}
+ }
+ async function changePassword(e){
+  e.preventDefault();setBusy(true);setMessage('');
+  const form=new FormData(e.currentTarget);
+  const password=String(form.get('password')||'');
+  if(password.length<12||password!==form.get('confirmPassword')){
+   setMessage('Passwords must match and contain at least 12 characters.');setBusy(false);return;
+  }
+  try{
+   if(!recoveryReady)throw new Error('Open the valid password reset link from your email first.');
+   const {error}=await recoveryClient.auth.updateUser({password});
+   if(error)throw error;
+   await recoveryClient.auth.signOut();
+   setRecoveryReady(false);setRecoveryMode('login');
+   window.history.replaceState({},'', '/?cleanerPortal=1');
+   setMessage('Password changed successfully. Sign in using your new password.');
+  }catch(err){setMessage(err.message)}finally{setBusy(false)}
+ }
  async function request(path,body,accessToken){
   const r=await fetch('/api/cleaner-account/'+path,{method:body?'POST':'GET',headers:{...(body?{'Content-Type':'application/json'}:{}),...(accessToken?{Authorization:'Bearer '+accessToken}:{})},...(body?{body:JSON.stringify(body)}:{})});
   const contentType=r.headers.get('content-type')||'';
@@ -163,13 +213,26 @@ function CleanerPortal(){
  async function markSent(){if(!draft)return;setBusy(true);try{await request(`admin/${draft.kind==='application'?'applications':'bookings'}/${draft.id}/email-sent`,{},token);setMessage('Marked as sent based on your confirmation.');setDraft(null);await loadAdmin(token);}catch(e){setMessage(e.message)}finally{setBusy(false)}}
  return <main className="cleaner-portal"><section className="cleaner-portal-card"><a className="brand" href="/">Clean<span>Sure</span></a>
  <h1>{invitation?'Create Cleaner Account':admin?'CleanSure Admin Dashboard':'Cleaner Dashboard'}</h1>
- {data ? admin ? <>
+ {recoveryMode==='request' && !invitation && !admin ? <form className="join-form" onSubmit={sendPasswordReset}>
+  <p>Enter the email address used for your CleanSure cleaner account. We will send a password reset link if the account exists.</p>
+  <label>Email address<input name="email" type="email" autoComplete="email" required /></label>
+  <button className="button" disabled={busy}>{busy?'Please wait…':'Send reset link'}</button>
+  <button type="button" className="button button-secondary" onClick={()=>{setRecoveryMode('login');setMessage('')}}>Back to login</button>
+ </form> : recoveryMode==='change' && !invitation && !admin ? <form className="join-form" onSubmit={changePassword}>
+  <p>{recoveryReady?'Create a new password for your cleaner account.':'Checking your password reset link…'}</p>
+  <label>New password<input type="password" name="password" minLength="12" autoComplete="new-password" required /></label>
+  <label>Confirm new password<input type="password" name="confirmPassword" minLength="12" autoComplete="new-password" required /></label>
+  <button className="button" disabled={busy||!recoveryReady}>{busy?'Saving…':'Change password'}</button>
+  {!recoveryReady&&<button type="button" className="button button-secondary" onClick={()=>setRecoveryMode('request')}>Request another link</button>}
+ </form> : data ? admin ? <>
  <div className="booking-actions"><button type="button" className="button button-secondary" onClick={()=>{setTab('applications');setDraft(null)}}>Cleaner applications ({data.applications?.length||0})</button><button type="button" className="button button-secondary" onClick={()=>{setTab('bookings');setDraft(null)}}>Customer bookings ({data.bookings?.length||0})</button><button type="button" className="button button-secondary" onClick={refresh}>Refresh</button></div>
  <div className="cleaner-admin-list">{tab==='applications' ? data.applications?.map(a=><article key={a.id}><strong>{a.first_name} {a.last_name}</strong><p>{a.cleaner_code} · {a.verification_status} · {a.city}</p><p>{a.email} · {a.phone}</p><p>{a.years_experience} years · {a.specialty}</p><p>Applied: {new Date(a.created_at).toLocaleString()}</p><p>Account: {a.registered_at?'Created':'Not created'} · Account email: {a.account_email_sent_at?'Marked sent':'Not marked sent'}</p><button className="button button-secondary" type="button" disabled={busy||!!a.registered_at} onClick={()=>makeInvite(a)}>Create Account Email</button></article>) : data.bookings?.map(b=><article key={b.id}><strong>{b.customer_name} · {b.booking_code}</strong><p>{b.customer_email}</p><p>{b.service} · {b.service_date} {b.service_time}</p><p>Status: {b.status||'Requested'} · Email: {b.confirmation_email_sent_at?'Marked sent':'Not marked sent'}</p><button type="button" className="button button-secondary" onClick={()=>makeBookingDraft(b)}>Create Booking Email</button></article>)}</div>
  {draft&&<section className="cleaner-email-draft" aria-label="Email draft"><h2>Review email draft</h2><p><strong>To:</strong> {draft.recipient}</p><p><strong>Subject:</strong> {draft.subject}</p><textarea readOnly value={draft.body} rows={12} style={{width:'100%',padding:'12px'}} aria-label="Email body"/><p className="form-note">Opening the email app does not send the message. After you send it, return here and mark it as sent.</p><div className="booking-actions"><a className="button" href={mailto(draft)}>Open email app</a><button className="button button-secondary" type="button" onClick={()=>navigator.clipboard?.writeText(draft.body)}>Copy body</button><button className="button button-secondary" type="button" disabled={busy} onClick={markSent}>Mark Email Sent</button><button className="button button-secondary" type="button" onClick={()=>setDraft(null)}>Close draft</button></div></section>}
  </> : <><p>Welcome, {data.profile.first_name}.</p><p>Cleaner ID: <strong>{data.profile.cleaner_code}</strong></p><p>Application status: <strong>{data.profile.verification_status}</strong></p><p>{data.canAcceptJobs?'Your account is approved. Job matching will be available in a later phase.':'Your application is awaiting review. Job access is not available yet.'}</p></> : <form onSubmit={submit} className="join-form">
  {invitation?<><p>Enter the Cleaner ID from your email and create a secure password.</p><label>Cleaner ID<input name="cleanerId" placeholder="AUS567893" required pattern="[A-Za-z]{3}[0-9]{6}"/></label><label>Password (at least 12 characters)<input type="password" name="password" minLength="12" autoComplete="new-password" required/></label></>:<><label>Email<input type="email" name="email" autoComplete="username" required/></label><label>Password<input type="password" name="password" autoComplete="current-password" required/></label></>}
- <button className="button" disabled={busy}>{busy?'Please wait…':invitation?'Create account':'Sign in'}</button></form>}
+ <button className="button" disabled={busy}>{busy?'Please wait…':invitation?'Create account':'Sign in'}</button>
+ {!invitation&&!admin&&<button type="button" className="button button-secondary" onClick={()=>{setRecoveryMode('request');setMessage('')}}>Forgot password?</button>}
+ </form>}
  {message&&<p className="form-status" role="status">{message}</p>}
  {token&&!invitation&&<button className="button button-secondary" onClick={()=>{sessionStorage.removeItem('cleansureAccessToken');setToken('');setData(null);setDraft(null)}}>Sign out</button>}
  <p><a href="/?cleanerPortal=1">Cleaner Login</a> · <a href="/">Home</a></p></section></main>
