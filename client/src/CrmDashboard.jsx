@@ -8,7 +8,31 @@ export default function CrmDashboard(){
  const [records,setRecords]=useState({bookings:[],cleaners:[],customers:[]});
  const [tab,setTab]=useState('overview'),[search,setSearch]=useState(''),[message,setMessage]=useState(''),[loading,setLoading]=useState(false),[draft,setDraft]=useState(null),[selectedCleaner,setSelectedCleaner]=useState(null),[cleanerPhoto,setCleanerPhoto]=useState('');
  async function api(path,body,method){const r=await fetch('/api/'+path,{method:method||(body?'POST':'GET'),headers:{...(body?{'Content-Type':'application/json'}:{}),Authorization:'Bearer '+token},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d;}
- async function load(){if(!token)return;setLoading(true);try{const d=await api('crm/overview');setRecords(d);setMessage('');}catch(e){setMessage(e.message)}finally{setLoading(false)}}
+ async function load(){
+  if(!token)return;
+
+  setLoading(true);
+
+  try{
+    const d=await api('crm/overview');
+    setRecords(d);
+    setMessage('');
+  }catch(e){
+    if (
+      e.message === 'Sign in required.' ||
+      e.message === 'Session expired or invalid.'
+    ){
+      sessionStorage.removeItem('cleansureAccessToken');
+      setToken('');
+      setRecords({bookings:[],cleaners:[],customers:[]});
+      setMessage('Your session expired. Please sign in again.');
+    }else{
+      setMessage(e.message);
+    }
+  }finally{
+    setLoading(false);
+  }
+}
  useEffect(()=>{if(token)load()},[token]);
  async function login(e){e.preventDefault();const f=new FormData(e.currentTarget);setLoading(true);try{const r=await fetch('/api/cleaner-account/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:f.get('email'),password:f.get('password')})});const d=await r.json();if(!r.ok)throw Error(d.error||'Login failed');sessionStorage.setItem('cleansureAccessToken',d.accessToken);setToken(d.accessToken)}catch(e){setMessage(e.message)}finally{setLoading(false)}}
  async function change(path,body){try{await api('crm/'+path,body,'PATCH');await load()}catch(e){setMessage(e.message)}}
