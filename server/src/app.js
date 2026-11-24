@@ -3,6 +3,7 @@ import cleanerApplicationRoutes from "./routes/cleanerApplicationRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import crmRoutes from "./routes/crmRoutes.js";
 import jobOfferRoutes from "./routes/jobOfferRoutes.js";
+import accountingRoutes from "./routes/accountingRoutes.js";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -41,6 +42,7 @@ app.use("/api/cleaner-applications", cleanerApplicationRoutes);
 app.use("/api/cleaner-account", cleanerAccountRoutes);
 app.use("/api/crm", crmRoutes);
 app.use("/api/job-offers", jobOfferRoutes);
+app.use("/api/accounting", accountingRoutes);
 
 const PORT = process.env.PORT || 3000;
 

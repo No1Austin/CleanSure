@@ -10,6 +10,9 @@ if (!supabaseUrl || !supabaseSecret) {
   );
 }
 
+// Privileged server-only database client. Never sign users in on this instance:
+// signInWithPassword mutates the client's in-memory auth session, which can
+// make subsequent database reads run under a user's RLS permissions.
 export const supabase = createClient(
   supabaseUrl,
   supabaseSecret,
@@ -20,3 +23,8 @@ export const supabase = createClient(
     }
   }
 );
+
+// Dedicated stateless auth client: user sessions cannot contaminate DB reads.
+export const authClient = createClient(supabaseUrl, supabaseSecret, {
+  auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false }
+});

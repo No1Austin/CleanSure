@@ -25,6 +25,7 @@ async function authenticate(req, res, next) {
   }
 }
 router.use(authenticate);
+router.use((_req,res,next)=>{res.set('Cache-Control','private, no-store');next();});
 
 function fail(res, error, context) {
   console.error('CRM ' + context, error?.message || error);
@@ -37,6 +38,7 @@ router.get('/overview', async (_req, res) => {
       supabase.from('bookings').select('id,booking_code,customer_name,customer_email,customer_phone,address,service,service_date,service_time,hours,cleaners,notes,estimated_total,status,crm_payment_status,crm_tags,crm_assigned_cleaner_id,created_at').order('created_at', { ascending: false }).limit(500),
       supabase.from('cleaner_profiles').select('id,cleaner_code,first_name,last_name,email,phone,city,specialty,years_experience,verification_status,auth_user_id,profile_photo_path,crm_tags,created_at').order('created_at', { ascending: false }).limit(500)
     ]);
+    console.info('CRM overview result', {bookings:bookings.data?.length ?? null,cleaners:cleaners.data?.length ?? null,bookingError:bookings.error?.code||null,cleanerError:cleaners.error?.code||null});
     if (bookings.error) return fail(res, bookings.error, 'load bookings');
     if (cleaners.error) return fail(res, cleaners.error, 'load cleaners');
     const customerMap = new Map();

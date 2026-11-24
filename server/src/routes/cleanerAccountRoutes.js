@@ -2,7 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { supabase } from '../lib/supabase.js';
+import { supabase, authClient } from '../lib/supabase.js';
 const router=Router();
 const hash=v=>createHash('sha256').update(v).digest('hex');
 const limiter=rateLimit({windowMs:15*60*1000,limit:8,standardHeaders:'draft-8',legacyHeaders:false});
@@ -24,10 +24,35 @@ router.post('/register',limiter,async(req,res)=>{
 router.post('/login',limiter,async(req,res)=>{
  const parsed=z.object({email:z.email(),password:z.string().min(1)}).safeParse(req.body);
  if(!parsed.success)return res.status(400).json({error:'Enter your email and password.'});
- const result=await supabase.auth.signInWithPassword(parsed.data);
+ const result=await authClient.auth.signInWithPassword(parsed.data);
  if(result.error)return res.status(401).json({error:'Invalid email or password.'});
  const user=result.data.user;
  if(!user.email_confirmed_at)return res.status(403).json({error:'Email verification required.'});
+ const {data:profile,error:profileError}=await supabase.from('cleaner_profiles').select('id,verification_status').eq('auth_user_id',user.id).maybeSingle();
+ if(profileError){console.error('Cleaner login profile lookup:',profileError.message);return res.status(503).json({error:'Unable to verify cleaner account.'});}
+ if(!profile)return res.status(403).json({error:'This login is for registered CleanSure cleaners only.'});
+ if(profile.verification_status!=='approved')return res.status(403).json({error:'Cleaner account is not currently approved.'});
+ return res.json({accessToken:result.data.session.access_token,refreshToken:result.data.session.refresh_token,expiresIn:result.data.session.expires_in});
+});
+router.post('/refresh',limiter,async(req,res)=>{
+ const parsed=z.object({refreshToken:z.string().min(16)}).safeParse(req.body);
+ if(!parsed.success)return res.status(400).json({error:'Invalid refresh request.'});
+ const result=await authClient.auth.refreshSession({refresh_token:parsed.data.refreshToken});
+ if(result.error||!result.data.session||!result.data.user?.email_confirmed_at)return res.status(401).json({error:'Cleaner session expired. Sign in again.'});
+ const {data:profile,error}=await supabase.from('cleaner_profiles').select('id,verification_status').eq('auth_user_id',result.data.user.id).maybeSingle();
+ if(error)return res.status(503).json({error:'Unable to verify cleaner profile.'});
+ if(!profile||profile.verification_status!=='approved')return res.status(403).json({error:'Cleaner access unavailable.'});
+ return res.json({accessToken:result.data.session.access_token,refreshToken:result.data.session.refresh_token,expiresIn:result.data.session.expires_in});
+});
+router.post('/admin/login',limiter,async(req,res)=>{
+ const parsed=z.object({email:z.email(),password:z.string().min(1)}).safeParse(req.body);
+ if(!parsed.success)return res.status(400).json({error:'Enter your email and password.'});
+ const result=await authClient.auth.signInWithPassword(parsed.data);
+ if(result.error)return res.status(401).json({error:'Invalid email or password.'});
+ const user=result.data.user;
+ if(!user?.email_confirmed_at)return res.status(403).json({error:'Email verification required.'});
+ const admins=(process.env.CLEANSURE_ADMIN_EMAILS||'').split(',').map(v=>v.trim().toLowerCase()).filter(Boolean);
+ if(!admins.includes((user.email||'').toLowerCase()))return res.status(403).json({error:'Administrator access required.'});
  return res.json({accessToken:result.data.session.access_token,expiresIn:result.data.session.expires_in});
 });
 async function auth(req,res,next){

@@ -1,10 +1,10 @@
+import CleanerWorkDashboard from './CleanerWorkDashboard.jsx';
 import CrmDashboard from './CrmDashboard.jsx';
 import { createClient } from '@supabase/supabase-js';
 import JobOfferPage from './JobOfferPage.jsx';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ArrowRight, Menu, X, ShieldCheck, Sparkles, Clock3, House, Building2, KeyRound, Star, CheckCircle2, Phone } from 'lucide-react';
 import './index.css';
-import './cleaner-onboarding.css';
 import './cleaner-onboarding.css';
 const recoveryClient = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -97,7 +97,7 @@ export default function App() {
  };
  if (new URLSearchParams(window.location.search).has('adminPortal')) return <CrmDashboard/>;
  if (new URLSearchParams(window.location.search).has('jobOffer')) return <JobOfferPage/>;
- if (new URLSearchParams(window.location.search).has('cleanerInvite') || new URLSearchParams(window.location.search).has('cleanerPortal') || new URLSearchParams(window.location.search).has('adminPortal')) return <CleanerPortal/>;
+ if (new URLSearchParams(window.location.search).has('cleanerInvite') || new URLSearchParams(window.location.search).has('cleanerPortal')) return <CleanerPortal/>;
  return <>
   <header className="site-header"><div className="container nav">
     <a href="#home" className="brand" aria-label="CleanSure home">Clean<span>Sure</span></a>
@@ -138,8 +138,8 @@ function ReactUsePhotoURL(file,setUrl){
 function CleanerPortal(){
  const params=new URLSearchParams(window.location.search);
  const invitation=params.get('cleanerInvite');
- const admin=params.has('adminPortal');
- const [token,setToken]=useState(()=>sessionStorage.getItem('cleansureAccessToken')||'');
+ const admin=false; // Admin CRM has its own portal and independent session.
+ const [token,setToken]=useState(()=>localStorage.getItem('cleansureCleanerAccessToken')||sessionStorage.getItem('cleansureCleanerAccessToken')||'');
  const [message,setMessage]=useState('');
  const [busy,setBusy]=useState(false);
  const [data,setData]=useState(null);
@@ -194,13 +194,40 @@ function CleanerPortal(){
   if(!contentType.includes('application/json'))throw new Error('Server returned a non-JSON response. Check API routes.');
   const result=await r.json();if(!r.ok)throw new Error(result.error||'Request failed');return result;
  }
+ const clearCleanerSession=useCallback(()=>{localStorage.removeItem('cleansureCleanerAccessToken');localStorage.removeItem('cleansureCleanerRefreshToken');sessionStorage.removeItem('cleansureCleanerAccessToken');setToken('');setData(null);},[]);
+ const refreshCleanerToken=useCallback(async()=>{
+  const refreshToken=localStorage.getItem('cleansureCleanerRefreshToken');
+  if(!refreshToken)return null;
+  try{
+   const r=await fetch('/api/cleaner-account/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken})});
+   const d=await r.json();if(!r.ok)throw Error(d.error||'Session expired');
+   localStorage.setItem('cleansureCleanerAccessToken',d.accessToken);
+   localStorage.setItem('cleansureCleanerRefreshToken',d.refreshToken);
+   setToken(d.accessToken);return d.accessToken;
+  }catch{clearCleanerSession();return null;}
+ },[clearCleanerSession]);
+ useEffect(()=>{
+  if(!token||invitation)return;
+  let cancelled=false;
+  (async()=>{
+   try{
+    let t=token;
+    let response=await fetch('/api/cleaner-account/me',{headers:{Authorization:'Bearer '+t},cache:'no-store'});
+    if(response.status===401){t=await refreshCleanerToken();if(!t)return;response=await fetch('/api/cleaner-account/me',{headers:{Authorization:'Bearer '+t},cache:'no-store'});}
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok){if(response.status===401||response.status===403)clearCleanerSession();else if(!cancelled)setMessage(result.error||'Unable to restore session');return;}
+    if(!cancelled)setData(result);
+   }catch(e){if(!cancelled)setMessage(e.message)}
+  })();
+  return ()=>{cancelled=true};
+ },[token,invitation,refreshCleanerToken,clearCleanerSession]);
  async function loadAdmin(accessToken){
   const [a,b]=await Promise.all([request('admin/applications',null,accessToken),request('admin/bookings',null,accessToken)]);
   setData({...a,...b});
  }
  async function submit(e){e.preventDefault();setBusy(true);setMessage('');const form=new FormData(e.currentTarget);try{
   if(invitation){await request('register',{token:invitation,cleanerId:String(form.get('cleanerId')).toUpperCase().trim(),password:form.get('password')});setMessage('Account created. Select Cleaner Login to sign in.');}
-  else {const r=await request('login',{email:form.get('email'),password:form.get('password')});sessionStorage.setItem('cleansureAccessToken',r.accessToken);setToken(r.accessToken);if(admin)await loadAdmin(r.accessToken);else setData(await request('me',null,r.accessToken));}
+  else {const r=await request('login',{email:form.get('email'),password:form.get('password')});localStorage.setItem('cleansureCleanerAccessToken',r.accessToken);if(r.refreshToken)localStorage.setItem('cleansureCleanerRefreshToken',r.refreshToken);sessionStorage.removeItem('cleansureCleanerAccessToken');setToken(r.accessToken);if(admin)await loadAdmin(r.accessToken);else setData(await request('me',null,r.accessToken));}
  }catch(err){setMessage(err.message)}finally{setBusy(false)}}
  async function refresh(){try{if(admin)await loadAdmin(token);else setData(await request('me',null,token));setMessage('')}catch(err){setMessage(err.message)}}
  async function makeInvite(a){setBusy(true);setMessage('');try{const d=await request(`admin/applications/${a.id}/invitation`,{},token);setDraft({kind:'application',id:a.id,...d});setMessage('New secure invitation created. Previous unused invitation links are now invalid.');}catch(e){setMessage(e.message)}finally{setBusy(false)}}
@@ -228,12 +255,12 @@ function CleanerPortal(){
  <div className="booking-actions"><button type="button" className="button button-secondary" onClick={()=>{setTab('applications');setDraft(null)}}>Cleaner applications ({data.applications?.length||0})</button><button type="button" className="button button-secondary" onClick={()=>{setTab('bookings');setDraft(null)}}>Customer bookings ({data.bookings?.length||0})</button><button type="button" className="button button-secondary" onClick={refresh}>Refresh</button></div>
  <div className="cleaner-admin-list">{tab==='applications' ? data.applications?.map(a=><article key={a.id}><strong>{a.first_name} {a.last_name}</strong><p>{a.cleaner_code} · {a.verification_status} · {a.city}</p><p>{a.email} · {a.phone}</p><p>{a.years_experience} years · {a.specialty}</p><p>Applied: {new Date(a.created_at).toLocaleString()}</p><p>Account: {a.registered_at?'Created':'Not created'} · Account email: {a.account_email_sent_at?'Marked sent':'Not marked sent'}</p><button className="button button-secondary" type="button" disabled={busy||!!a.registered_at} onClick={()=>makeInvite(a)}>Create Account Email</button></article>) : data.bookings?.map(b=><article key={b.id}><strong>{b.customer_name} · {b.booking_code}</strong><p>{b.customer_email}</p><p>{b.service} · {b.service_date} {b.service_time}</p><p>Status: {b.status||'Requested'} · Email: {b.confirmation_email_sent_at?'Marked sent':'Not marked sent'}</p><button type="button" className="button button-secondary" onClick={()=>makeBookingDraft(b)}>Create Booking Email</button></article>)}</div>
  {draft&&<section className="cleaner-email-draft" aria-label="Email draft"><h2>Review email draft</h2><p><strong>To:</strong> {draft.recipient}</p><p><strong>Subject:</strong> {draft.subject}</p><textarea readOnly value={draft.body} rows={12} style={{width:'100%',padding:'12px'}} aria-label="Email body"/><p className="form-note">Opening the email app does not send the message. After you send it, return here and mark it as sent.</p><div className="booking-actions"><a className="button" href={mailto(draft)}>Open email app</a><button className="button button-secondary" type="button" onClick={()=>navigator.clipboard?.writeText(draft.body)}>Copy body</button><button className="button button-secondary" type="button" disabled={busy} onClick={markSent}>Mark Email Sent</button><button className="button button-secondary" type="button" onClick={()=>setDraft(null)}>Close draft</button></div></section>}
- </> : <><p>Welcome, {data.profile.first_name}.</p><p>Cleaner ID: <strong>{data.profile.cleaner_code}</strong></p><p>Application status: <strong>{data.profile.verification_status}</strong></p><p>{data.canAcceptJobs?'Your account is approved. Job matching will be available in a later phase.':'Your application is awaiting review. Job access is not available yet.'}</p></> : <form onSubmit={submit} className="join-form">
+ </> : <><p>Welcome, {data.profile.first_name}.</p><p>Cleaner ID: <strong>{data.profile.cleaner_code}</strong></p><p>Application status: <strong>{data.profile.verification_status}</strong></p><p>{data.canAcceptJobs?'Your account is approved. Job matching will be available in a later phase.':'Your application is awaiting review. Job access is not available yet.'}</p><CleanerWorkDashboard token={token} requestToken={refreshCleanerToken} onExpired={clearCleanerSession}/></> : <form onSubmit={submit} className="join-form">
  {invitation?<><p>Enter the Cleaner ID from your email and create a secure password.</p><label>Cleaner ID<input name="cleanerId" placeholder="AUS567893" required pattern="[A-Za-z]{3}[0-9]{6}"/></label><label>Password (at least 12 characters)<input type="password" name="password" minLength="12" autoComplete="new-password" required/></label></>:<><label>Email<input type="email" name="email" autoComplete="username" required/></label><label>Password<input type="password" name="password" autoComplete="current-password" required/></label></>}
  <button className="button" disabled={busy}>{busy?'Please wait…':invitation?'Create account':'Sign in'}</button>
  {!invitation&&!admin&&<button type="button" className="button button-secondary" onClick={()=>{setRecoveryMode('request');setMessage('')}}>Forgot password?</button>}
  </form>}
  {message&&<p className="form-status" role="status">{message}</p>}
- {token&&!invitation&&<button className="button button-secondary" onClick={()=>{sessionStorage.removeItem('cleansureAccessToken');setToken('');setData(null);setDraft(null)}}>Sign out</button>}
+ {token&&!invitation&&<button className="button button-secondary" onClick={()=>{clearCleanerSession();setDraft(null)}}>Sign out</button>}
  <p><a href="/?cleanerPortal=1">Cleaner Login</a> · <a href="/">Home</a></p></section></main>
 }
