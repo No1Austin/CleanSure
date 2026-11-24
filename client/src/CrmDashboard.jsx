@@ -1,40 +1,95 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useRef,useState} from 'react';
 import './crm.css';
 const statuses=['requested','pending','confirmed','assigned','in_progress','completed','cancelled','expired'];
 const payments=['unpaid','pending','paid','failed','refunded','disputed'];
 const fmt=n=>new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD'}).format(Number(n||0));
+const EMPTY_RECORDS = {bookings:[],cleaners:[],customers:[]};
+const SNAPSHOT_KEY = 'cleansureCrmLastGoodOverviewV1';
+function readSnapshot(){
+ try {
+  const raw=sessionStorage.getItem(SNAPSHOT_KEY);
+  if(!raw)return null;
+  const parsed=JSON.parse(raw);
+  if(!parsed || !validOverview(parsed.records) || typeof parsed.savedAt!=='number')return null;
+  return parsed;
+ }catch{return null;}
+}
+function validOverview(data){
+ return !!data && ['bookings','cleaners','customers'].every(k=>Array.isArray(data[k]));
+}
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 export default function CrmDashboard(){
  const [token,setToken]=useState(()=>sessionStorage.getItem('cleansureAccessToken')||'');
- const [records,setRecords]=useState({bookings:[],cleaners:[],customers:[]});
+ const [snapshot,setSnapshot]=useState(()=>sessionStorage.getItem('cleansureAccessToken')?readSnapshot():null);
+ const [records,setRecords]=useState(()=>sessionStorage.getItem('cleansureAccessToken')?readSnapshot()?.records||EMPTY_RECORDS:EMPTY_RECORDS);
+ const [hasLoaded,setHasLoaded]=useState(()=>!!(sessionStorage.getItem('cleansureAccessToken')&&readSnapshot()));
+ const [lastUpdated,setLastUpdated]=useState(()=>sessionStorage.getItem('cleansureAccessToken')?readSnapshot()?.savedAt||null:null);
+ const [connection,setConnection]=useState('idle');
  const [tab,setTab]=useState('overview'),[search,setSearch]=useState(''),[message,setMessage]=useState(''),[loading,setLoading]=useState(false),[draft,setDraft]=useState(null),[selectedCleaner,setSelectedCleaner]=useState(null),[cleanerPhoto,setCleanerPhoto]=useState('');
- async function api(path,body,method){const r=await fetch('/api/'+path,{method:method||(body?'POST':'GET'),headers:{...(body?{'Content-Type':'application/json'}:{}),Authorization:'Bearer '+token},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d;}
- async function load(){
-  if(!token)return;
-
+ const requestSequence=useRef(0);
+ const currentToken=useRef(token);
+ currentToken.current=token;
+ const api=useCallback(async(path,body,method,authToken=currentToken.current)=>{
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),25000);
+  try {
+   const r=await fetch('/api/'+path,{
+    method:method||(body?'POST':'GET'),
+    headers:{...(body?{'Content-Type':'application/json'}:{}),Authorization:'Bearer '+authToken},
+    ...(body?{body:JSON.stringify(body)}:{}),
+    cache:'no-store',signal:controller.signal
+   });
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok){const err=new Error(d.error||`Server returned HTTP ${r.status}`);err.status=r.status;throw err;}
+   return d;
+  }catch(error){if(error.name==='AbortError'){const e=new Error('Server request timed out.');e.status=504;throw e;}throw error;}
+  finally{clearTimeout(timeout);}
+ },[]);
+ const load=useCallback(async()=>{
+  const authToken=currentToken.current;
+  if(!authToken)return;
+  const sequence=++requestSequence.current;
   setLoading(true);
-
-  try{
-    const d=await api('crm/overview');
-    setRecords(d);
-    setMessage('');
-  }catch(e){
-    if (
-      e.message === 'Sign in required.' ||
-      e.message === 'Session expired or invalid.'
-    ){
-      sessionStorage.removeItem('cleansureAccessToken');
-      setToken('');
-      setRecords({bookings:[],cleaners:[],customers:[]});
-      setMessage('Your session expired. Please sign in again.');
-    }else{
-      setMessage(e.message);
-    }
-  }finally{
-    setLoading(false);
+  setConnection('loading');
+  let lastError;
+  for(let attempt=0;attempt<3;attempt++){
+   try{
+    const d=await api('crm/overview',undefined,undefined,authToken);
+    if(!validOverview(d))throw new Error('The server returned incomplete CRM data. Existing records were preserved.');
+    // An unexpected all-empty response is not trusted if a prior nonempty snapshot exists.
+    // Genuine deletion/empty data should be verified in Supabase before replacing the snapshot.
+    const previous=readSnapshot();
+    const previousCount=previous?previous.records.bookings.length+previous.records.cleaners.length:0;
+    const nextCount=d.bookings.length+d.cleaners.length;
+    if(previousCount>0&&nextCount===0)throw new Error('CRM returned an unexpectedly empty overview. Previous data is preserved; verify records in Supabase.');
+    if(sequence!==requestSequence.current||authToken!==currentToken.current)return;
+    const savedAt=Date.now();
+    try{sessionStorage.setItem(SNAPSHOT_KEY,JSON.stringify({records:d,savedAt}));}catch{/* Storage quota or private mode: in-memory data still works. */}
+    setRecords(d);setSnapshot({records:d,savedAt});setHasLoaded(true);setLastUpdated(savedAt);
+    setConnection('online');setMessage('');setLoading(false);
+    return;
+   }catch(e){
+    lastError=e;
+    if(sequence!==requestSequence.current||authToken!==currentToken.current)return;
+    if(e.status===401||e.status===403)break;
+    if(attempt<2 && (e.status===502||e.status===503||e.status===504||e.status===429||e.name==='TypeError'))await sleep(800*(attempt+1));
+    else break;
+   }
   }
-}
- useEffect(()=>{if(token)load()},[token]);
- async function login(e){e.preventDefault();const f=new FormData(e.currentTarget);setLoading(true);try{const r=await fetch('/api/cleaner-account/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:f.get('email'),password:f.get('password')})});const d=await r.json();if(!r.ok)throw Error(d.error||'Login failed');sessionStorage.setItem('cleansureAccessToken',d.accessToken);setToken(d.accessToken)}catch(e){setMessage(e.message)}finally{setLoading(false)}}
+  if(sequence!==requestSequence.current||authToken!==currentToken.current)return;
+  if(lastError?.status===401){
+   sessionStorage.removeItem('cleansureAccessToken');
+   sessionStorage.removeItem(SNAPSHOT_KEY);
+   currentToken.current='';setToken('');setRecords(EMPTY_RECORDS);setHasLoaded(false);
+   setConnection('idle');setMessage('Your session expired. Please sign in again.');
+  }else{
+   setConnection('offline');
+   setMessage((lastError?.message||'Unable to load CRM data')+(readSnapshot()?' — showing last successfully loaded data.':' — no data has been loaded yet.'));
+  }
+  setLoading(false);
+ },[api]);
+ useEffect(()=>{if(token)load();},[token,load]);
+ async function login(e){e.preventDefault();const f=new FormData(e.currentTarget);setLoading(true);try{const r=await fetch('/api/cleaner-account/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:f.get('email'),password:f.get('password')})});const d=await r.json();if(!r.ok)throw Error(d.error||'Login failed');sessionStorage.removeItem(SNAPSHOT_KEY);sessionStorage.setItem('cleansureAccessToken',d.accessToken);currentToken.current=d.accessToken;setRecords(EMPTY_RECORDS);setHasLoaded(false);setLastUpdated(null);setToken(d.accessToken)}catch(e){setMessage(e.message)}finally{setLoading(false)}}
  async function change(path,body){try{await api('crm/'+path,body,'PATCH');await load()}catch(e){setMessage(e.message)}}
  async function tags(kind,item){const input=prompt('Comma-separated labels (up to 15)',(item.crm_tags||[]).join(', '));if(input===null)return;const values=[...new Set(input.split(',').map(s=>s.trim()).filter(Boolean))];if(values.length>15||values.some(x=>x.length>32)){setMessage('Maximum 15 labels, 32 characters each');return;}await change(`${kind}/${item.id}`,{tags:values});}
  async function openCleaner(c){setSelectedCleaner(c);setCleanerPhoto('');if(c.profile_photo_path){try{const d=await api(`crm/cleaners/${c.id}/photo`);setCleanerPhoto(d.url)}catch(e){setMessage(e.message)}}}
@@ -47,8 +102,8 @@ export default function CrmDashboard(){
  const count=s=>records.bookings.filter(b=>b.status===s).length;
  const stats=[['Bookings',records.bookings.length],['Pending',count('pending')],['Unassigned',records.bookings.filter(b=>!b.crm_assigned_cleaner_id&&!['cancelled','expired','completed'].includes(b.status)).length],['Completed',count('completed')],['Customers',records.customers.length],['Cleaners',records.cleaners.length]];
  if(!token)return <main className="crm-login"><form onSubmit={login} className="crm-login-card"><a className="brand" href="/">Clean<span>Sure</span></a><h1>CRM administrator login</h1><label>Email<input type="email" name="email" required/></label><label>Password<input type="password" name="password" required/></label><button className="crm-primary" disabled={loading}>Sign in</button><p role="status">{message}</p><a href="/">Back to website</a></form></main>;
- return <div className="crm-shell"><aside className="crm-side"><a className="brand" href="/">Clean<span>Sure</span></a><p>CRM & Operations</p>{['overview','bookings','customers','cleaners','dispatch','insights'].map(t=><button key={t} className={tab===t?'selected':''} onClick={()=>{setTab(t);setDraft(null)}}>{t[0].toUpperCase()+t.slice(1)}</button>)}<a href="/">Website</a><button onClick={()=>{sessionStorage.removeItem('cleansureAccessToken');setToken('');setRecords({bookings:[],cleaners:[],customers:[]})}}>Sign out</button></aside><main className="crm-main"><header><div><h1>{tab==='overview'?'Operations overview':tab[0].toUpperCase()+tab.slice(1)}</h1><p>CleanSure business management</p></div><button onClick={load} disabled={loading}>{loading?'Loading…':'Refresh data'}</button></header><input className="crm-search" placeholder="Search bookings, customers, cleaners, codes, locations…" value={search} onChange={e=>setSearch(e.target.value)}/>{message&&<p className="crm-message" role="status">{message}</p>}
- {(tab==='overview'||tab==='insights')&&<><div className="crm-stats">{stats.map(([k,v])=><div key={k}><small>{k}</small><strong>{v}</strong></div>)}</div><section className="crm-panel"><h2>CRM insights</h2><p>Customer segments are based on observed booking history, not AI predictions.</p><div className="crm-stats"><div><small>Repeat bookers</small><strong>{records.customers.filter(c=>c.bookings>1).length}</strong></div><div><small>One booking</small><strong>{records.customers.filter(c=>c.bookings===1).length}</strong></div><div><small>Pending payments</small><strong>{records.bookings.filter(b=>['unpaid','pending'].includes(b.crm_payment_status)).length}</strong></div></div><p>Follow-up suggestions: review customers with one completed booking, repeat customers without a recent booking, and unresolved bookings. Confirm marketing consent before promotional contact.</p></section></>}
+ return <div className="crm-shell"><aside className="crm-side"><a className="brand" href="/">Clean<span>Sure</span></a><p>CRM & Operations</p>{['overview','bookings','customers','cleaners','dispatch','insights'].map(t=><button key={t} className={tab===t?'selected':''} onClick={()=>{setTab(t);setDraft(null)}}>{t[0].toUpperCase()+t.slice(1)}</button>)}<a href="/">Website</a><button onClick={()=>{requestSequence.current++;sessionStorage.removeItem('cleansureAccessToken');sessionStorage.removeItem(SNAPSHOT_KEY);currentToken.current='';setToken('');setRecords(EMPTY_RECORDS);setHasLoaded(false);setLastUpdated(null);setConnection('idle')}}>Sign out</button></aside><main className="crm-main"><header><div><h1>{tab==='overview'?'Operations overview':tab[0].toUpperCase()+tab.slice(1)}</h1><p>CleanSure business management</p><p role="status">{connection==='offline'?'Connection problem — last known data shown':connection==='loading'?'Refreshing CRM data…':hasLoaded?'Data loaded successfully':'Waiting for CRM data'}{lastUpdated?' · Last successful update: '+new Date(lastUpdated).toLocaleString():''}</p></div><button onClick={load} disabled={loading}>{loading?'Loading…':'Refresh data'}</button></header><input className="crm-search" placeholder="Search bookings, customers, cleaners, codes, locations…" value={search} onChange={e=>setSearch(e.target.value)}/>{message&&<p className="crm-message" role="status">{message}</p>}
+ {(tab==='overview'||tab==='insights')&&<><div className="crm-stats">{stats.map(([k,v])=><div key={k}><small>{k}</small><strong>{hasLoaded?v:'—'}</strong></div>)}</div><section className="crm-panel"><h2>CRM insights</h2><p>Customer segments are based on observed booking history, not AI predictions.</p><div className="crm-stats"><div><small>Repeat bookers</small><strong>{hasLoaded?records.customers.filter(c=>c.bookings>1).length:'—'}</strong></div><div><small>One booking</small><strong>{hasLoaded?records.customers.filter(c=>c.bookings===1).length:'—'}</strong></div><div><small>Pending payments</small><strong>{hasLoaded?records.bookings.filter(b=>['unpaid','pending'].includes(b.crm_payment_status)).length:'—'}</strong></div></div><p>Follow-up suggestions: review customers with one completed booking, repeat customers without a recent booking, and unresolved bookings. Confirm marketing consent before promotional contact.</p></section></>}
  {(tab==='bookings'||tab==='dispatch'||tab==='overview')&&<section className="crm-panel"><h2>{tab==='dispatch'?'Dispatch queue':'Bookings'} ({bookings.length})</h2><div className="crm-grid">{bookings.filter(b=>tab!=='dispatch'||(!b.crm_assigned_cleaner_id&&!['completed','cancelled','expired'].includes(b.status))).map(b=><article key={b.id} className="crm-item"><div className="crm-item-head"><strong>{b.booking_code||b.id.slice(0,8)}</strong><span>{fmt(b.estimated_total)}</span></div><h3>{b.customer_name}</h3><p>{b.service} · {b.service_date} {b.service_time} · {b.hours}h</p><p>{b.address}</p><p>{b.customer_email} · {b.customer_phone}</p><div className="crm-controls"><label>Booking status<select value={b.status||'pending'} onChange={e=>change(`bookings/${b.id}`,{status:e.target.value})}>{statuses.map(s=><option key={s}>{s}</option>)}</select></label><label>Payment status<select value={b.crm_payment_status||'unpaid'} onChange={e=>change(`bookings/${b.id}`,{paymentStatus:e.target.value})}>{payments.map(s=><option key={s}>{s}</option>)}</select></label></div><p>Labels: {(b.crm_tags||[]).join(', ')||'None'}</p><div className="crm-actions"><button onClick={()=>tags('bookings',b)}>Edit labels</button><button onClick={()=>assign(b)}>Assign cleaner</button><button onClick={()=>offer(b)}>Create WhatsApp offer</button><button onClick={()=>{setDraft({recipient:b.customer_email,subject:'CleanSure — Booking '+b.booking_code,message:`Hello ${b.customer_name},\n\nRegarding booking ${b.booking_code} for ${b.service} on ${b.service_date} at ${b.service_time}.\n\nCleanSure`})}}>Booking email</button></div></article>)}</div></section>}
  {tab==='customers'&&<section className="crm-panel"><h2>Customers ({customers.length})</h2><p>Profiles grouped by email from existing bookings.</p><div className="crm-grid">{customers.map(c=><article className="crm-item" key={c.email}><h3>{c.name}</h3><p>{c.email} · {c.phone}</p><p>{c.bookings} booking(s) · {fmt(c.totalEstimated)} estimated</p><p>{c.bookings>1?'Repeat booker':'One booking recorded'}</p><p>Last booking: {c.lastBooking?new Date(c.lastBooking).toLocaleDateString():'—'}</p></article>)}</div></section>}
  {tab==='cleaners'&&<section className="crm-panel"><h2>Cleaners ({cleaners.length})</h2><div className="crm-grid">{cleaners.map(c=><article className="crm-item" key={c.id}><h3>{c.first_name} {c.last_name}</h3><p>{c.cleaner_code} · {c.verification_status}</p><p>{c.city} · {c.specialty} · {c.years_experience} years</p><p>{c.email} · {c.phone}</p><p>Account: {c.auth_user_id?'Registered':'Not registered'}</p><p>Labels: {(c.crm_tags||[]).join(', ')||'None'}</p><div className="crm-actions"><button onClick={()=>openCleaner(c)}>View full profile / Review</button><button onClick={()=>tags('cleaners',c)}>Edit labels</button></div></article>)}</div></section>}
