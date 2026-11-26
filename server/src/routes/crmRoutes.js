@@ -35,7 +35,7 @@ function fail(res, error, context) {
 router.get('/overview', async (_req, res) => {
   try {
     const [bookings, cleaners] = await Promise.all([
-      supabase.from('bookings').select('id,booking_code,customer_name,customer_email,customer_phone,address,service,service_date,service_time,hours,cleaners,notes,estimated_total,status,crm_payment_status,crm_tags,crm_assigned_cleaner_id,created_at').order('created_at', { ascending: false }).limit(500),
+      supabase.from('bookings').select('id,booking_code,customer_name,customer_email,customer_phone,address,service,service_date,service_time,hours,cleaners,notes,estimated_total,status,crm_payment_status,crm_tags,crm_assigned_cleaner_id,stripe_paid,assigned_at,customer_started,cleaner_started,customer_completed,cleaner_completed,cleaner_rating,customer_rating,company_rating,created_at').order('created_at', { ascending: false }).limit(500),
       supabase.from('cleaner_profiles').select('id,cleaner_code,first_name,last_name,email,phone,city,specialty,years_experience,verification_status,auth_user_id,profile_photo_path,crm_tags,created_at').order('created_at', { ascending: false }).limit(500)
     ]);
     console.info('CRM overview result', {bookings:bookings.data?.length ?? null,cleaners:cleaners.data?.length ?? null,bookingError:bookings.error?.code||null,cleanerError:cleaners.error?.code||null});
@@ -108,7 +108,7 @@ router.patch('/bookings/:id', async (req, res) => {
   const p = schema.safeParse(req.body);
   if (!p.success || !Object.keys(p.data || {}).length) return res.status(400).json({ error: 'Invalid booking update' });
   const patch = {};
-  if (p.data.status) patch.status = p.data.status;
+  if (p.data.status || p.data.paymentStatus) return res.status(409).json({error:'Payment and lifecycle status are controlled by verified events'});
   if (p.data.paymentStatus) patch.crm_payment_status = p.data.paymentStatus;
   if (p.data.tags) patch.crm_tags = [...new Set(p.data.tags)];
   try {
@@ -139,7 +139,7 @@ router.post('/bookings/:id/assign', async (req, res) => {
     const { data: cleaner, error: ce } = await supabase.from('cleaner_profiles').select('id,verification_status,auth_user_id').eq('id', p.data.cleanerId).maybeSingle();
     if (ce) return fail(res, ce, 'check cleaner');
     if (!cleaner || cleaner.verification_status !== 'approved' || !cleaner.auth_user_id) return res.status(409).json({ error: 'Cleaner must be approved and registered' });
-    const { data, error } = await supabase.from('bookings').update({ crm_assigned_cleaner_id: cleaner.id, status: 'assigned' }).eq('id', req.params.id).in('status', ['requested', 'pending', 'confirmed', 'assigned']).select('id').maybeSingle();
+    const { data, error } = await supabase.from('bookings').update({ crm_assigned_cleaner_id: cleaner.id, status: 'assigned' }).eq('id', req.params.id).eq('stripe_paid',true).in('status', ['requested', 'pending', 'confirmed', 'assigned']).select('id').maybeSingle();
     if (error) return fail(res, error, 'assign booking');
     if (!data) return res.status(409).json({ error: 'Booking unavailable for assignment' });
     return res.json({ success: true });
@@ -149,17 +149,19 @@ router.post('/bookings/:id/assign', async (req, res) => {
 router.post('/bookings/:id/offer', async (req, res) => {
   if (!uuid.safeParse(req.params.id).success) return res.status(400).json({ error: 'Invalid booking ID' });
   try {
-    const { data: booking, error: be } = await supabase.from('bookings').select('id,booking_code,service,service_date,service_time,hours,cleaners,address,status').eq('id', req.params.id).maybeSingle();
+    const { data: booking, error: be } = await supabase.from('bookings').select('id,booking_code,service,service_date,service_time,hours,cleaners,service_city,pets,cleaner_hourly_rate,stripe_paid,status').eq('id', req.params.id).maybeSingle();
     if (be) return fail(res, be, 'load booking');
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
+    if (!booking.stripe_paid) return res.status(409).json({error:'Payment required'});
     if (!['requested', 'pending', 'confirmed'].includes(booking.status)) return res.status(409).json({ error: 'Only pending or confirmed bookings can be offered' });
+    if(Number(booking.cleaners)!==1||booking.cleaner_hourly_rate==null)return res.status(409).json({error:'Confirm pay and use manual dispatch for multi-cleaner bookings'});
     const token = randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 48 * 3600000).toISOString();
     const { error } = await supabase.from('crm_job_offers').insert({ booking_id: booking.id, token_hash: sha(token), expires_at: expiresAt, created_by: req.adminId });
     if (error) return fail(res, error, 'create job offer');
     const base = (process.env.PUBLIC_SITE_URL || 'http://localhost:5173').replace(/\/$/, '');
     const link = base + '/?jobOffer=' + encodeURIComponent(token);
-    const area = 'Exact location disclosed after assignment';
+    const area = booking.service_city || 'Area not recorded';
     return res.status(201).json({ link, expiresAt, message: `CleanSure job opportunity\nRef: ${booking.booking_code}\nService: ${booking.service}\nArea: ${area}\nDate: ${booking.service_date} ${booking.service_time}\nDuration: ${booking.hours} hours\nApproved cleaners: review and respond here: ${link}` });
   } catch (error) { return fail(res, error, 'create job offer'); }
 });

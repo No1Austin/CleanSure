@@ -1,3 +1,4 @@
+import {checkout} from '../lib/stripeCheckout.js';
 import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
@@ -22,6 +23,10 @@ const bookingSchema = z.object({
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   hours: z.coerce.number().int().min(1).max(24),
   cleaners: z.coerce.number().int().min(1).max(20),
+  city: z.enum(['Kitchener','Waterloo','Cambridge','Guelph','Other']),
+  nickname: z.string().trim().min(1).max(60),
+  lastCleaned: z.enum(['within_week','over_week']),
+  acceptedTotalCents: z.coerce.number().int().positive(),
   pets: z.enum(['yes', 'no']),
   supplies: z.enum(['customer', 'company']),
   notes: z.string().max(2000).optional().default(''),
@@ -43,10 +48,13 @@ router.post('/', handleUpload, async (req, res) => {
   const parsed = bookingSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ success: false, error: 'Invalid booking details', details: z.flattenError(parsed.error) });
   const b = parsed.data;
-  const hourlyRate = b.supplies === 'company' ? 35 : 30;
+  const premium = Number(b.pets === 'yes') + Number(b.lastCleaned === 'over_week');
+  const hourlyRate = 35 + premium;
+  const cleanerHourlyRate = 21 + premium;
   const subtotalCents = hourlyRate * b.hours * b.cleaners * 100;
   const hstCents = Math.round(subtotalCents * 13 / 100);
   const totalCents = subtotalCents + hstCents;
+  if (b.acceptedTotalCents !== totalCents) return res.status(409).json({error:'Quote changed. Review the current price before booking.'});
   const estimate = {currency:'CAD',hourlyRate,subtotal:subtotalCents/100,hst:hstCents/100,total:totalCents/100};
   const photos = req.files ?? [];
   if (photos.length > 5) return res.status(400).json({ success: false, error: 'Maximum 5 photos.' });
@@ -77,6 +85,7 @@ router.post('/', handleUpload, async (req, res) => {
       service_date: b.date, service_time: b.time,
       hours: b.hours, cleaners: b.cleaners, pets: b.pets, supplies: b.supplies,
       notes: b.notes, customer_name: b.name, customer_email: b.email, customer_phone: b.phone,
+      service_city: b.city, customer_nickname: b.nickname, last_cleaned: b.lastCleaned, cleaner_hourly_rate: cleanerHourlyRate,
       hourly_rate: hourlyRate, estimated_subtotal: estimate.subtotal,
       estimated_hst: estimate.hst, estimated_total: estimate.total,
       estimate_accepted_at: new Date().toISOString(),
@@ -97,7 +106,8 @@ router.post('/', handleUpload, async (req, res) => {
       });
       if (photoError) throw photoError;
     }
-    return res.status(201).json({ success: true, bookingCode: data.booking_code, status: data.status, photoCount: processed.length, estimate, message: 'Booking saved successfully' });
+    const checkoutUrl=await checkout(bookingId,totalCents);
+    return res.status(201).json({ checkoutUrl, success: true, bookingCode: data.booking_code, status: data.status, photoCount: processed.length, estimate, message: 'Booking saved successfully' });
   } catch (error) {
     console.error('Booking/photo save failed:', error?.message ?? error);
     // Best-effort compensation; log failures for manual follow-up.

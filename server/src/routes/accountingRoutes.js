@@ -100,4 +100,29 @@ router.post('/admin/records',adminOnly,async(req,res)=>{
  if(result.error)return fail(res,result.error);
  return res.json({record:decorate(result.data)});
 });
+// Cash ledger uses actual payment dates, not service dates. Legacy job payouts are counted once.
+async function allRows(table,columns){
+ const rows=[]; for(let offset=0;;offset+=500){const {data,error}=await supabase.from(table).select(columns).order('id').range(offset,offset+499);if(error)throw error;rows.push(...data);if(data.length<500)return rows;}
+}
+router.get('/admin/finance',adminOnly,async(req,res)=>{
+ const parsed=periodSchema.safeParse(req.query);if(!parsed.success)return res.status(400).json({error:'Invalid period'});
+ try{
+ const [work,entries,cleaners]=await Promise.all([allRows('cleaner_work_records',select),allRows('finance_cash_entries','*'),allRows('cleaner_profiles','id,first_name,last_name,cleaner_code')]);
+ const {from,to}=parsed.data;const day=v=>v?new Intl.DateTimeFormat('en-CA',{timeZone:'America/Toronto',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(v)):null;
+ const within=d=>d&&(!from||d>=from)&&(!to||d<=to);const before=d=>d&&(!to||d<=to);
+ const movements=[];const balances=new Map();let undated=0;
+ for(const raw of work){const r=decorate(raw);const earned=Math.round(r.cleaner_earned*100);const paidDate=day(raw.cleaner_paid_at);const receiptDate=day(raw.customer_paid_at);
+ if(raw.customer_payment_status==='paid'&&receiptDate)movements.push({id:r.id+'-receipt',date:receiptDate,kind:'receipt',amount_cents:Math.round(r.customer_received*100),reference:r.booking_id});
+ if(raw.customer_payment_status==='paid'&&!receiptDate||raw.cleaner_payout_status==='paid'&&!paidDate||raw.refund_cents>0||raw.customer_payment_status==='refunded')undated++;
+ if(raw.cleaner_payout_status==='paid'&&paidDate)movements.push({id:r.id+'-payout',date:paidDate,kind:'payout',amount_cents:-earned,reference:r.booking_id,cleaner_id:r.cleaner_id});
+ if(before(r.work_date)){const b=balances.get(r.cleaner_id)||{cleaner_id:r.cleaner_id,earned_cents:0,paid_cents:0,hours:0};b.earned_cents+=earned;if(raw.cleaner_payout_status==='paid'&&before(paidDate))b.paid_cents+=earned;if(r.work_status==='completed')b.hours+=Number(r.approved_hours);balances.set(r.cleaner_id,b);}
+ }
+ for(const e of entries)movements.push({...e,date:e.entry_date,amount_cents:e.amount_cents*(['expense','capital_out','tax_remittance'].includes(e.kind)?-1:1)});
+ const sum=rows=>rows.reduce((n,r)=>n+Number(r.amount_cents),0);const period=movements.filter(r=>within(r.date));const closing=sum(movements.filter(r=>before(r.date)));const opening=from?sum(movements.filter(r=>r.date<from)):0;
+ const people=new Map(cleaners.map(c=>[c.id,c]));const payroll=[...balances.values()].map(b=>({...b,cleaner:people.get(b.cleaner_id),balance_cents:b.earned_cents-b.paid_cents}));
+ res.json({opening_cents:opening,closing_cents:closing,inflow_cents:sum(period.filter(r=>r.amount_cents>0)),outflow_cents:-sum(period.filter(r=>r.amount_cents<0)),expenses_cents:-sum(period.filter(r=>r.kind==='expense')),payouts_cents:-sum(period.filter(r=>r.kind==='payout')),owed_cents:payroll.reduce((n,b)=>n+b.balance_cents,0),payroll,movements:period.sort((a,b)=>b.date.localeCompare(a.date)),review_count:undated});
+ }catch(e){return fail(res,e)}
+});
+const cashSchema=z.object({entryDate:yyyyMmDd,kind:z.enum(['expense','opening_balance','capital_in','capital_out','tax_remittance','other_income']),category:z.string().trim().min(1).max(100),amount:z.number().positive().max(10000000),reference:z.string().trim().min(1).max(150),notes:z.string().max(1000).default('')});
+router.post('/admin/cash-entries',adminOnly,async(req,res)=>{const p=cashSchema.safeParse(req.body);if(!p.success)return res.status(400).json({error:'Enter valid date, category, positive amount and unique reference'});const v=p.data;const {data,error}=await supabase.from('finance_cash_entries').insert({entry_date:v.entryDate,kind:v.kind,category:v.category,amount_cents:cents(v.amount),reference:v.reference,notes:v.notes,created_by:req.user.id}).select().single();if(error?.code==='23505')return res.status(409).json({error:'Reference already recorded for this entry type'});if(error)return fail(res,error);res.status(201).json({entry:data});});
 export default router;

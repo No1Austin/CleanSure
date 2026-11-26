@@ -22,19 +22,40 @@ async function findOffer(req,res){
  if(!data||new Date(data.expires_at)<=new Date()){res.status(410).json({error:'Job offer expired or unavailable'});return null;}
  return data;
 }
+const fields='stripe_paid,booking_code,service,service_date,service_time,hours,cleaners,supplies,pets,last_cleaned,service_city,cleaner_hourly_rate,status,crm_assigned_cleaner_id';
+router.get('/assigned',async(req,res)=>{
+ const {data,error}=await supabase.from('bookings').select(fields+',address,customer_nickname,notes').eq('crm_assigned_cleaner_id',req.cleanerId).in('status',['assigned','in_progress','completed']).order('service_date');
+ if(error)return res.status(500).json({error:'Unable to load assignments'});
+ res.json({jobs:data.map(b=>({...b,crm_assigned_cleaner_id:undefined})),supportPhone:process.env.CLEANSURE_SUPPORT_PHONE||null});
+});
+router.get('/available',async(req,res)=>{
+ const {data,error}=await supabase.from('bookings').select('id,'+fields).eq('stripe_paid',true).eq('cleaners',1).is('crm_assigned_cleaner_id',null).in('status',['requested','pending','confirmed']).not('cleaner_hourly_rate','is',null).order('service_date').limit(100);
+ if(error)return res.status(500).json({error:'Unable to load available jobs'});
+ res.json({jobs:data});
+});
+router.post('/available/:id/accept',async(req,res)=>{
+ const {data,error}=await supabase.from('bookings').update({crm_assigned_cleaner_id:req.cleanerId,status:'assigned'}).eq('id',req.params.id).eq('stripe_paid',true).eq('cleaners',1).is('crm_assigned_cleaner_id',null).in('status',['requested','pending','confirmed']).not('cleaner_hourly_rate','is',null).select('id').maybeSingle();
+ if(error||!data)return res.status(409).json({error:'Job no longer available'});res.json({success:true});
+});
 router.get('/:token',async(req,res)=>{
  const offer=await findOffer(req,res);if(!offer)return;
- const {data,error}=await supabase.from('bookings').select('booking_code,service,service_date,service_time,hours,cleaners,supplies,notes,status,crm_assigned_cleaner_id').eq('id',offer.booking_id).maybeSingle();
+ const {data,error}=await supabase.from('bookings').select(fields).eq('id',offer.booking_id).maybeSingle();
  if(error||!data)return res.status(404).json({error:'Booking unavailable'});
- // Intentionally excludes full address, customer identity, and private photos.
- res.json({booking:data,available:!offer.accepted_by&&!data.crm_assigned_cleaner_id&&['requested','pending','confirmed'].includes(data.status)});
+ const assigned=data.crm_assigned_cleaner_id===req.cleanerId && ['assigned','in_progress','confirmed'].includes(data.status);
+ const available=data.stripe_paid&&!offer.accepted_by&&!data.crm_assigned_cleaner_id&&['requested','pending','confirmed'].includes(data.status)&&Number(data.cleaners)===1&&data.cleaner_hourly_rate!=null;
+ let details={};
+ if(assigned){const r=await supabase.from('bookings').select('address,customer_nickname,notes').eq('id',offer.booking_id).eq('crm_assigned_cleaner_id',req.cleanerId).in('status',['assigned','in_progress','confirmed']).maybeSingle();if(r.error||!r.data)return res.status(409).json({error:'Assignment changed'});details=r.data;}
+ delete data.crm_assigned_cleaner_id;
+ res.json({booking:{...data,...details},available,assigned,supportPhone:assigned?process.env.CLEANSURE_SUPPORT_PHONE||null:null});
 });
 router.post('/:token/accept',async(req,res)=>{
  const offer=await findOffer(req,res);if(!offer)return;
+ const check=await supabase.from('bookings').select('stripe_paid,cleaners,cleaner_hourly_rate').eq('id',offer.booking_id).maybeSingle();
+ if(check.error||!check.data||!check.data.stripe_paid||Number(check.data.cleaners)!==1||check.data.cleaner_hourly_rate==null)return res.status(409).json({error:'This booking requires manual dispatch or a confirmed pay rate'});
  const {data,error}=await supabase.rpc('crm_accept_offer',{p_hash:sha(req.params.token),p_cleaner:req.cleanerId});
  if(error){console.error('Accept offer:',error.message);return res.status(500).json({error:'Unable to accept offer'});}
  if(!data)return res.status(409).json({error:'Job already taken or no longer available'});
- res.json({success:true,message:'Job accepted. Contact CleanSure dispatch for assignment details.'});
+ res.json({success:true,message:'Job accepted. Your assignment details are available.'});
 });
 router.post('/:token/decline',async(req,res)=>{
  const offer=await findOffer(req,res);if(!offer)return;
