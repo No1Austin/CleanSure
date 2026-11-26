@@ -1,0 +1,88 @@
+/* Public homepage only. Import after existing styles. */
+.cs-public{--cs-green:#075e50;--cs-mint:#ddf8f1;--cs-ink:#102c29;--cs-white:#f5fbfa;color:var(--cs-ink);background:white;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6}
+.cs-public *{box-sizing:border-box}
+.cs-public .container{width:min(1200px,calc(100% - 48px));margin-inline:auto}
+.cs-public .site-header{background:#fff;border-bottom:1px solid #e1efeb;position:sticky;top:0;z-index:30}
+.cs-public .nav{min-height:78px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+.cs-public .brand{font-size:30px;font-weight:850;letter-spacing:-1.8px;color:var(--cs-ink);text-decoration:none}.cs-public .brand span{color:#07856c}
+.cs-public .nav-links{display:flex;align-items:center;gap:24px}.cs-public .nav-links>a:not(.button){color:var(--cs-ink);font-size:14px;font-weight:650;text-decoration:none}
+.cs-public .button{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;background:var(--cs-green);color:white;border:1px solid transparent;border-radius:12px;padding:14px 22px;font:inherit;font-weight:700;text-decoration:none;cursor:pointer;overflow:hidden;transition:transform .2s,background .2s}
+.cs-public .button:hover{transform:translateY(-2px);background:#064c42}.cs-public .button:disabled{opacity:.55;cursor:not-allowed;transform:none}.cs-public .button:focus-visible,.cs-public a:focus-visible,.cs-public input:focus-visible,.cs-public select:focus-visible,.cs-public textarea:focus-visible{outline:3px solid #159d83;outline-offset:3px}
+.cs-public .button::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,#ffffff35 50%,transparent 70%);transform:translateX(-120%);pointer-events:none}.cs-public .button:hover::after{animation:cs-shine .65s ease-out}
+@keyframes cs-shine{to{transform:translateX(120%)}}
+.cs-public .button-light{background:white;color:var(--cs-green)}.cs-public .button-light:hover{background:#ddf8f1}.cs-public .button-outline{background:transparent;border-color:#ffffffa0;color:white}.cs-public .button-secondary{background:#eaf6f2;color:var(--cs-green);border-color:#cfe5df}.cs-public .button-secondary:hover{background:#d9eee7}
+.cs-public .hero{position:relative;isolation:isolate;overflow:hidden;min-height:620px;display:flex;align-items:center;background:#06483f;color:white}
+.cs-public .hero-photo,.cs-public .hero-shade{position:absolute;inset:0;pointer-events:none}.cs-public .hero-photo{background-size:cover;background-position:center right;z-index:-3}.cs-public .hero-shade{z-index:-2;background:linear-gradient(90deg,#063c36f5 0%,#063c36dc 34%,#063c3660 70%,#063c3620 100%)}
+.cs-public .hero-content{position:relative;z-index:2;padding-block:85px}.cs-public .hero h1{font-size:clamp(42px,5.5vw,78px);line-height:1.04;letter-spacing:-.055em;margin:20px 0 24px;max-width:760px;color:white}.cs-public .hero h1 em{font-style:normal;color:#a7f3d0}.cs-public .hero p{max-width:540px;font-size:19px;color:#f1fffa}.cs-public .hero-actions,.cs-public .hero-trust{display:flex;flex-wrap:wrap;gap:14px;margin-top:28px}.cs-public .hero-trust span,.cs-public .intro span{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:650}
+.cs-public .eyebrow{font-size:12px;letter-spacing:.16em;font-weight:800;color:#08705d}.cs-public .eyebrow.light{color:#b7f7de}
+.cs-public .cs-bubbles{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}.cs-public .cs-bubbles span{position:absolute;left:var(--x);bottom:var(--y);width:var(--s);aspect-ratio:1;border-radius:50%;border:1px solid #ffffff65;background:radial-gradient(circle at 28% 22%,#ffffff75 0%,transparent 19%),radial-gradient(circle at 70% 75%,#a5f3fc35,transparent 65%);box-shadow:inset 0 0 12px #c7fff13b;animation:cs-float var(--d) ease-in-out infinite alternate;animation-delay:var(--delay,0s)}
+@keyframes cs-float{from{transform:translate3d(0,0,0)}to{transform:translate3d(14px,-48px,0)}}
+.cs-public .intro{background:#effaf6;border-bottom:1px solid #e0efe9}.cs-public .intro-inner{display:flex;justify-content:space-between;flex-wrap:wrap;gap:20px;padding-block:24px;color:var(--cs-green)}
+.cs-public .section{padding-block:88px;scroll-margin-top:90px}.cs-public h2{font-size:clamp(30px,4vw,48px);line-height:1.13;letter-spacing:-.04em;margin:12px 0 20px;color:var(--cs-ink)}.cs-public h3{line-height:1.3;letter-spacing:-.02em}.cs-public .section-head{display:flex;align-items:end;justify-content:space-between;gap:30px;margin-bottom:32px}.cs-public .section-head p{max-width:390px;color:#526963}
+.cs-public .service-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}.cs-public .service-card{display:flex;flex-direction:column;align-items:flex-start;background:#fff;border:1px solid #dcebe6;border-radius:22px;padding:26px;box-shadow:0 8px 24px #063c3608;transition:transform .2s,border-color .2s}.cs-public .service-card:hover{transform:translateY(-5px);border-color:#74cdb3}.cs-public .service-icon{display:grid;place-items:center;width:60px;height:60px;border-radius:18px;background:linear-gradient(145deg,#e3faf2,#c8eee3);color:var(--cs-green);position:relative}.cs-public .service-icon::after{content:'✦';position:absolute;right:-5px;top:-9px;color:#159d83;font-size:17px}.cs-public .service-card h3{font-size:21px;margin:22px 0 8px}.cs-public .service-card p{color:#526963;margin:0 0 24px}.cs-public .service-card a{margin-top:auto;color:var(--cs-green);display:flex;align-items:center;gap:8px;font-weight:750;text-decoration:none}
+.cs-public .why{background:linear-gradient(130deg,#f2fbf8,#e1f5ee)}.cs-public .why-layout,.cs-public .booking-layout{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:start}.cs-public .why-list{display:grid;gap:14px}.cs-public .why-list>div{display:flex;gap:18px;background:white;padding:22px;border-radius:18px;border:1px solid #e0eee8}.cs-public .why-list>div>svg{flex-shrink:0;color:var(--cs-green)}.cs-public .why-list h3,.cs-public .why-list p{margin:0 0 6px}.cs-public .why-list p{color:#526963}
+.cs-public .booking-section{background:#f7fbfa}.cs-public .booking-card{background:white;border:1px solid #dcebe6;border-radius:24px;padding:32px;box-shadow:0 18px 50px #063c360d;min-width:0}.cs-public .booking-aside-image{border-radius:22px;min-height:260px;background-size:cover;background-position:center}.cs-public .booking-progress-label{color:var(--cs-green);font-weight:750;font-size:13px}.cs-public .booking-track{height:7px;border-radius:20px;background:#e1eee9;overflow:hidden;margin:12px 0 24px}.cs-public .booking-track>div{height:100%;background:#07856c;border-radius:20px;transition:width .25s}.cs-public .booking-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.cs-public [hidden]{display:none!important}.cs-public .full{grid-column:1/-1}.cs-public .form-field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:650;min-width:0}.cs-public .form-field input,.cs-public .form-field select,.cs-public .form-field textarea,.cs-public .join-form input:not([type=checkbox]),.cs-public .join-form select{width:100%;min-width:0;padding:12px;border:1px solid #cbded7;border-radius:10px;background:#fbfefd;color:var(--cs-ink);font:inherit}.cs-public .booking-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px;flex-wrap:wrap}.cs-public .form-note{font-size:13px;color:#526963}.cs-public .booking-photo-panel{margin-top:20px;padding:16px;border:1px dashed #9cc9ba;border-radius:14px}.cs-public .booking-review>div:not(.review-price),.cs-public .price-line,.cs-public .review-price>div{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #e4efea;overflow-wrap:anywhere}.cs-public .review-total,.cs-public .price-total{color:var(--cs-green);font-size:20px;font-weight:800}
+.cs-public .team{background:#e6f7ef}.cs-public .team-inner,.cs-public .footer-inner{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}.cs-public footer{padding-block:32px;background:white;border-top:1px solid #e1efeb}.cs-public .menu-toggle,.cs-public .cs-mobile-book{display:none}
+@media(max-width:1000px){.cs-public .service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cs-public .why-layout,.cs-public .booking-layout{gap:30px}.cs-public .menu-toggle{display:grid;place-items:center;background:white;border:1px solid #dcebe6;border-radius:10px;padding:9px;color:var(--cs-green)}.cs-public .nav-links{display:none;position:absolute;top:100%;left:0;right:0;background:white;padding:24px;box-shadow:0 12px 24px #063c3615}.cs-public .nav-links.open{display:flex;flex-direction:column;align-items:stretch}}
+@media(max-width:700px){.cs-public .container{width:calc(100% - 32px)}.cs-public .nav{min-height:64px}.cs-public .hero{min-height:530px}.cs-public .hero-shade{background:linear-gradient(90deg,#063c36ef,#063c3690)}.cs-public .hero-content{padding-block:56px}.cs-public .hero p{font-size:16px}.cs-public .section{padding-block:52px;scroll-margin-top:70px}.cs-public .section-head,.cs-public .why-layout,.cs-public .booking-layout{display:grid;grid-template-columns:1fr;gap:18px}.cs-public .service-grid{gap:12px}.cs-public .service-card{padding:18px;border-radius:16px}.cs-public .service-card h3{font-size:17px}.cs-public .service-card p,.cs-public .service-card a{font-size:14px}.cs-public .booking-card{padding:20px}.cs-public .booking-fields{grid-template-columns:1fr}.cs-public .cs-bubbles span:nth-child(n+5){display:none}.cs-public .cs-mobile-book{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:25;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:white;border-top:1px solid #dcebe6;box-shadow:0 -5px 20px #063c360d}.cs-public .cs-mobile-book small{display:block}.cs-public .cs-mobile-book .button{padding:10px 12px;font-size:13px}.cs-public footer{padding-bottom:110px}}
+@media(max-width:380px){.cs-public .service-grid{grid-template-columns:1fr}.cs-public .hero-actions .button{width:100%}}
+@media(prefers-reduced-motion:reduce){.cs-public *,.cs-public *::before,.cs-public *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+/* Selected light homepage concept. Existing hero photo remains supplied by index.css. */
+.cs-public .hero{background:linear-gradient(115deg,#f0fbf7,#d3f3e9);color:#103e33;min-height:540px}
+.cs-public .hero-photo{left:48%;background-position:center; border-radius:120px 0 0 120px}
+.cs-public .hero-shade{background:linear-gradient(90deg,#f0fbf7 0%,#e6f8f0 43%,#e6f8f000 62%)}
+.cs-public .hero h1{color:#103e33;max-width:52%;font-size:clamp(40px,5vw,70px)}
+.cs-public .hero h1 em{color:#11876c}.cs-public .hero p{color:#385e53;max-width:46%}.cs-public .eyebrow.light{color:#08705d}.cs-public .hero-trust{color:#075e50;max-width:48%}.cs-public .hero .button-light{background:#087c62;color:white}.cs-public .hero .button-outline{border-color:#89bbaa;color:#075e50;background:#ffffffb0}.cs-public .hero .button-outline:hover{background:white}
+.cs-public .service-card{overflow:hidden;padding:0 22px 24px}.cs-public .service-icon{width:calc(100% + 44px);height:130px;margin-inline:-22px;border-radius:0;background:linear-gradient(145deg,#e0f6ed,#b8e2d7)}.cs-public .service-icon svg{width:48px;height:48px}.cs-public .service-icon::after{top:20px;right:24px}.cs-public .service-card:nth-child(2) .service-icon{background:linear-gradient(145deg,#e6f6fa,#b7dce3)}.cs-public .service-card:nth-child(3) .service-icon{background:linear-gradient(145deg,#eaf5de,#c9e2b6)}
+.cs-public .booking-section{background:#e3f4ed}.cs-public footer{background:#103e33;color:#d2e8de}.cs-public footer .brand{color:white}.cs-public footer .brand span{color:#91e8c9}
+@media(max-width:700px){.cs-public .hero{min-height:0;display:block}.cs-public .hero-photo{position:relative;left:auto;inset:auto;height:250px;border-radius:0;background-position:center;z-index:0}.cs-public .hero-shade{display:none}.cs-public .hero-content{padding-block:30px 42px}.cs-public .hero h1,.cs-public .hero p,.cs-public .hero-trust{max-width:100%}.cs-public .service-card{padding:0 14px 18px}.cs-public .service-icon{width:calc(100% + 28px);margin-inline:-14px;height:100px}}
+
+/* Final overrides reconciled with the existing responsive stylesheet. */
+.cs-public .hero-photo,.cs-public .booking-aside-image{background-image:url('/images/cleansure-team.webp')}
+.cs-public .hero{padding-top:0}
+.cs-public .hero-content{background:transparent}
+.cs-public .hero-actions{max-width:48%}
+.cs-public .hero .button-light:hover{background:#075e50;color:white}
+.cs-public .hero-photo{inset:0 0 0 48%;height:auto}
+.cs-public .service-card p{min-height:0}
+.cs-public .cs-bubbles span{animation-iteration-count:1;animation-duration:5s;animation-fill-mode:both}
+@media(max-width:700px){
+.cs-public .hero{padding-top:0}
+.cs-public .hero-photo{inset:auto;height:clamp(220px,60vw,350px);border-radius:0}
+.cs-public .hero-content{background:transparent;width:min(100% - 36px,1180px);padding:30px 0 42px}
+.cs-public .hero-actions{max-width:100%}
+.cs-public .hero-trust{color:#075e50}
+.cs-public .cs-bubbles span:nth-child(n+5){display:none}
+}
+@media(prefers-reduced-motion:reduce){.cs-public .cs-bubbles span{animation:none!important}}
+
+/* Approved photo update: full-width hero, original team at booking. */
+.cs-public .hero{isolation:isolate;position:relative;overflow:hidden;min-height:540px;background:#e8f5ef}
+.cs-public .hero-photo{position:absolute;inset:0;width:100%;height:100%;border-radius:0;background-image:url('/images/cleansure-scrubber.webp');background-repeat:no-repeat;background-size:cover;background-position:right center;z-index:-3}
+.cs-public .hero-shade{display:block;position:absolute;inset:0;z-index:-2;background:linear-gradient(90deg,#f4fbf8 0%,#f4fbf8f5 28%,#f4fbf8d9 42%,#f4fbf840 60%,transparent 78%)}
+.cs-public .hero-content{position:relative;z-index:2;background:transparent}
+.cs-public .booking-aside-image{display:block;width:100%;height:auto;min-height:0;aspect-ratio:3/2;background-image:url('/images/cleansure-team.webp');background-size:contain;background-repeat:no-repeat;background-position:center center;background-color:#e3f4ed;border-radius:20px}
+@media(min-width:701px){.cs-public .hero-photo{background-size:auto 100%;background-color:#dceee7}.cs-public .hero-shade{background:linear-gradient(90deg,#f4fbf8 0%,#f4fbf8 30%,#f4fbf8eb 40%,#f4fbf850 58%,transparent 76%)}}
+@media(max-width:700px){.cs-public .hero{min-height:650px;display:flex;align-items:flex-end}.cs-public .hero-photo{position:absolute;inset:0;height:100%;background-size:auto 55%;background-position:center top;background-color:#eaf7f1}.cs-public .hero-shade{background:linear-gradient(180deg,transparent 0%,transparent 27%,#eaf7f1b0 42%,#eaf7f1 57%)}.cs-public .hero-content{padding:300px 0 42px}.cs-public .hero h1,.cs-public .hero p,.cs-public .hero-trust,.cs-public .hero-actions{max-width:100%}}
+
+
+
+/* Lightweight, short-lived soap bubbles. */
+.cs-rainbow-bubbles { display:block !important; position:fixed; inset:0; overflow:hidden; pointer-events:none; z-index:40; }
+.cs-rainbow-bubbles > span { position:absolute; display:block; left:var(--x); top:var(--y) !important; bottom:auto !important; width:var(--s); height:var(--s); border-radius:50%; pointer-events:none;
+ border:1.5px solid rgba(var(--tint),.85);
+ background:radial-gradient(ellipse at 27% 22%, #fff 0%, #ffffffd9 5%, transparent 23%), radial-gradient(ellipse at 77% 79%, #ffffffb0, transparent 22%), radial-gradient(circle, rgba(var(--tint),.05) 35%, rgba(var(--tint),.12) 62%, rgba(var(--tint),.45) 94%);
+ box-shadow:inset 0 0 9px #ffffffc0, 0 1px 4px rgba(var(--tint),.35);
+ animation:cs-bubble-pop var(--d) linear var(--delay) infinite !important; animation-play-state:running !important; }
+.cs-rainbow-bubbles > span::after { content:''; position:absolute; inset:0; border-radius:50%; border:3px dotted rgba(var(--tint),.9); opacity:0; animation:cs-bubble-splash var(--d) linear var(--delay) infinite !important; }
+@keyframes cs-bubble-pop {
+ 0% {transform:translate3d(0,0,0) scale(.55);opacity:0}
+ 12% {opacity:.85}
+ 60% {transform:translate3d(var(--drift),-38px,0) scale(1);opacity:.85}
+ 65% {transform:translate3d(var(--drift),-42px,0) scale(1.12);opacity:1}
+ 66%,72% {background:none;border-color:transparent;box-shadow:none;opacity:1;transform:translate3d(var(--drift),-42px,0) scale(1.12)}
+ 75%,100% {opacity:0;transform:translate3d(var(--drift),-42px,0) scale(1.12)}
+}
+@keyframes cs-bubble-splash {0%,65%{opacity:0;transform:scale(.8)}66%{opacity:1;transform:scale(1)}73%,100%{opacity:0;transform:scale(1.65)}}
+@media(max-width:700px){.cs-rainbow-bubbles > span:nth-child(n+4){display:none}.cs-rainbow-bubbles > span{max-width:48px;max-height:48px}}
+@media print{.cs-rainbow-bubbles{display:none !important}}

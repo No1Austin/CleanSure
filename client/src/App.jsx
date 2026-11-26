@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import CleanerDashboard from './CleanerDashboard.jsx';
 import CleaningMonitor from './CleaningMonitor.jsx';
 import CrmDashboard from './CrmDashboard.jsx';
@@ -8,6 +9,7 @@ import { ArrowRight, Menu, X, ShieldCheck, Sparkles, Clock3, House, Building2, K
 import './index.css';
 import './homepage-responsive.css';
 import './cleaner-onboarding.css';
+import './cleansure-homepage.css';
 const recoveryClient = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -20,6 +22,28 @@ const services = [
   { icon: KeyRound, title: 'Move-In & Move-Out', text: 'A fresh start for your next home or the next occupant.' },
   { icon: Building2, title: 'Commercial Cleaning', text: 'Professional cleaning solutions for workplaces and offices.' },
 ];
+function CleaningBubbles() {
+  const [bubbles] = useState(() => Array.from({ length: 6 }, (_, i) => ({
+    x: 5 + (i * 100 / 6 + Math.random() * 8) % 85,
+    size: 38 + Math.random() * 48,
+    duration: 4 + Math.random() * 2,
+    y: 15 + Math.random() * 72,
+    delay: -((i + 0.5) / 6) * 5,
+    drift: Math.random() * 50 - 25,
+    tint: ['220, 230, 235', '95, 180, 245', '245, 150, 190', '110, 210, 165', '180, 150, 240', '75, 205, 215'][i],
+  })));
+  return createPortal(<div className="cs-rainbow-bubbles" aria-hidden="true">
+    {bubbles.map((b, i) => <span key={i} onAnimationIteration={(event) => {
+      if (event.animationName !== 'cs-bubble-pop') return;
+      event.currentTarget.style.setProperty('--x', `${5 + Math.random() * 85}%`);
+      event.currentTarget.style.setProperty('--y', `${15 + Math.random() * 72}%`);
+    }} style={{
+      '--x': `${b.x}%`, '--y': `${b.y}%`, '--s': `${b.size}px`, '--d': `${b.duration}s`,
+      '--delay': `${b.delay}s`, '--drift': `${b.drift}px`, '--tint': b.tint,
+    }}/>) }
+  </div>, document.body);
+}
+
 export default function App() {
  const [menuOpen, setMenuOpen] = useState(false);
  const [step,setStep] = useState(0);
@@ -104,17 +128,18 @@ export default function App() {
  if (new URLSearchParams(window.location.search).has('jobOffer')) return <JobOfferPage/>;
  if (new URLSearchParams(window.location.search).has('cleanerInvite') || new URLSearchParams(window.location.search).has('cleanerPortal')) return <CleanerPortal/>;
  return <div className="cs-public">
+  <CleaningBubbles/>
   <header className="site-header"><div className="container nav">
     <a href="#home" className="brand" aria-label="CleanSure home">Clean<span>Sure</span></a>
     <button className="menu-toggle" aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen} onClick={()=>setMenuOpen(!menuOpen)}>{menuOpen?<X/>:<Menu/>}</button>
     <nav className={menuOpen?'nav-links open':'nav-links'} aria-label="Main navigation" onClick={()=>setMenuOpen(false)}><a href="#services">Our Services</a><a href="#why-us">Why CleanSure</a><a href="#team">Join Our Team</a><a href="/?cleanerPortal=1">Cleaner Login</a><a className="button button-small" href="#booking">Book Cleaning <ArrowRight size={17}/></a></nav>
   </div></header>
   <main id="home">
-    <section className="hero" aria-labelledby="hero-title"><div className="hero-photo" role="img" aria-label="Two smiling CleanSure cleaning professionals wearing protective equipment"/><div className="hero-shade"/><div className="container hero-content"><span className="eyebrow light">A CLEANER SPACE. A BETTER DAY.</span><h1 id="hero-title">Professional cleaning.<br/><em>Peace of mind.</em></h1><p>Enjoy a fresher home or workspace with dependable cleaning professionals and a simple booking experience.</p><div className="hero-actions"><a className="button button-light" href="#booking">Book a Cleaning <ArrowRight size={19}/></a><a className="button button-outline" href="#services">Explore Services</a></div><div className="hero-trust"><span><ShieldCheck size={19}/> Safety-minded service</span><span><Clock3 size={19}/> Convenient scheduling</span></div></div></section>
+    <section className="hero" aria-labelledby="hero-title"><div className="hero-photo" role="img" aria-label="Professional green rotary floor scrubber cleaning a tiled floor with soap foam"/><div className="hero-shade"/><div className="container hero-content"><span className="eyebrow light">A CLEANER SPACE. A BETTER DAY.</span><h1 id="hero-title">A cleaner home.<br/><em>A happier life.</em></h1><p>Exceptional cleaning for the spaces you love. Enjoy more of your life while we take care of the mess.</p><div className="hero-actions"><a className="button button-light" href="#booking">Book a Cleaning <ArrowRight size={19}/></a><a className="button button-outline" href="#services">Explore Services</a></div><div className="hero-trust"><span><ShieldCheck size={19}/> Safety-minded service</span><span><Clock3 size={19}/> Convenient scheduling</span></div></div></section>
     <section className="intro"><div className="container intro-inner"><span><Star size={18} fill="currentColor"/> Thoughtful service</span><span><ShieldCheck size={19}/> Cleaner identity verification planned</span><span><CheckCircle2 size={19}/> Easy online booking</span></div></section>
     <section className="section" id="services"><div className="container"><div className="section-head"><div><span className="eyebrow">WHAT WE DO</span><h2>Cleaning for every kind of space.</h2></div><p>From routine upkeep to a complete refresh, choose the service that fits your space and schedule.</p></div><div className="service-grid">{services.map(({icon:Icon,title,text})=><article className="service-card" key={title}><span className="service-icon"><Icon size={27}/></span><h3>{title}</h3><p>{text}</p><a href="#booking" onClick={()=>setBooking(p=>({...p,service:title.includes("Deep")?"deep":title.includes("Move")?"move":title.includes("Commercial")?"commercial":"residential"}))}>Book this service <ArrowRight size={17}/></a></article>)}</div></div></section>
     <section className="section why" id="why-us"><div className="container why-layout"><div><span className="eyebrow">THE CLEANSURE DIFFERENCE</span><h2>More than clean.<br/>Confidence in every visit.</h2><p>We’re designing a straightforward cleaning experience with clear service details, reliable communication, and customer-focused support.</p><a className="button" href="#booking">Get Started <ArrowRight size={18}/></a></div><div className="why-list"><div><ShieldCheck/><div><h3>Trust comes first</h3><p>Our planned cleaner verification process helps customers know who is arriving.</p></div></div><div><Clock3/><div><h3>Designed around your schedule</h3><p>Choose a preferred date, time, and service duration.</p></div></div><div><Sparkles/><div><h3>Attention to the details</h3><p>Share your cleaning needs, pets, product preferences, and special instructions.</p></div></div></div></div></section>
-    <section className="section booking-section" id="booking"><div className="container booking-layout"><div className="booking-aside"><span className="eyebrow">BOOK WITH CONFIDENCE</span><h2>Let's make your space shine.</h2><p>Tell us what you need in four simple steps. Review your quote and pay securely before dispatch.</p><div className="booking-aside-image" aria-label="CleanSure cleaning team"/></div><div className="booking-card"><div className="booking-progress-label">Step {step+1} of 4 · {['Your space','Schedule','Contact','Review'][step]}</div><div className="booking-track"><div style={{width:`${(step+1)*25}%`}}/></div>{bookingSuccess ? <div className="booking-success" role="status" aria-live="polite"><CheckCircle2 size={46} aria-hidden="true"/><h3>Booking request received!</h3><p>Your cleaning request has been submitted successfully.</p><p><strong>Reference: {bookingSuccess.code}</strong></p><p><strong>Estimated total: {cad(bookingSuccess.total)}</strong> including HST</p><p>{bookingSuccess.photoCount} {bookingSuccess.photoCount===1?'photo':'photos'} attached</p><p>We’ll contact you to confirm availability and your appointment. No payment has been collected.</p><button className="button" type="button" onClick={startNewBooking}>Start another booking</button></div> : <><h3>{['Tell us about your space','Choose your schedule','How can we reach you?','Review your request'][step]}</h3><form onSubmit={sendBooking}>
+    <section className="section booking-section" id="booking"><div className="container booking-layout"><div className="booking-aside"><span className="eyebrow">BOOK WITH CONFIDENCE</span><h2>Let's make your space shine.</h2><p>Tell us what you need in four simple steps. Review your quote and pay securely before dispatch.</p><div className="booking-aside-image" role="img" aria-label="CleanSure cleaning team"/></div><div className="booking-card"><div className="booking-progress-label">Step {step+1} of 4 · {['Your space','Schedule','Contact','Review'][step]}</div><div className="booking-track"><div style={{width:`${(step+1)*25}%`}}/></div>{bookingSuccess ? <div className="booking-success" role="status" aria-live="polite"><CheckCircle2 size={46} aria-hidden="true"/><h3>Booking request received!</h3><p>Your cleaning request has been submitted successfully.</p><p><strong>Reference: {bookingSuccess.code}</strong></p><p><strong>Estimated total: {cad(bookingSuccess.total)}</strong> including HST</p><p>{bookingSuccess.photoCount} {bookingSuccess.photoCount===1?'photo':'photos'} attached</p><p>We’ll contact you to confirm availability and your appointment. No payment has been collected.</p><button className="button" type="button" onClick={startNewBooking}>Start another booking</button></div> : <><h3>{['Tell us about your space','Choose your schedule','How can we reach you?','Review your request'][step]}</h3><form onSubmit={sendBooking}>
     <div className="booking-fields" hidden={step!==0}>{field('Cleaning service','service','text',[['residential','Residential cleaning'],['deep','Deep cleaning'],['move','Move-in / move-out'],['commercial','Commercial cleaning'],['other','Other']])}{field('Property type','property','text',[['house','House'],['apartment','Apartment / condo'],['office','Office / business'],['other','Other']])}{field('Service address','address')}{field('City / municipality','city','text',[['','Select city'],['Kitchener','Kitchener'],['Waterloo','Waterloo'],['Cambridge','Cambridge'],['Guelph','Guelph'],['Other','Other']])}{field('Bedrooms','bedrooms','text',[['0','Studio / none'],['1','1'],['2','2'],['3','3'],['4','4'],['5','5+']])}{field('Bathrooms','bathrooms','text',[['1','1'],['2','2'],['3','3'],['4','4+']])}</div>
     <div className="booking-photo-panel" hidden={step!==0}><label className="form-field full" htmlFor="property-photos">Upload a few pictures of the rooms or places to be cleaned</label><p className="form-note">Add up to 5 photos (JPG, PNG or WebP, maximum 5 MB each). Please avoid people, documents and sensitive details.</p><input id="property-photos" className="photo-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={choosePhotos} aria-describedby="photo-help"/><p id="photo-help" className="form-note">Photos are shared only with authorized CleanSure staff for booking coordination.</p>{photoError&&<p className="form-status" role="alert">{photoError}</p>}<p className="form-note" aria-live="polite">{photos.length} {photos.length===1?'photo':'photos'} selected</p><div className="photo-preview-grid">{photos.map((file,i)=><PhotoPreview key={`${file.name}-${file.lastModified}-${i}`} file={file} onRemove={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}/>)}</div></div>
      <div className="booking-fields" hidden={step!==1}>{field('Preferred date','date','date')}{field('Preferred time','time','time')}{field('Estimated hours','hours','text',[['2','2 hours'],['3','3 hours'],['4','4 hours'],['5','5 hours'],['6','6 hours'],['8','8 hours']])}{field('Number of cleaners','cleaners','text',[['1','1'],['2','2'],['3','3'],['4','4']])}{field('When was the property last cleaned?','lastCleaned','text',[['','Select an option'],['within_week','Within the last 7 days'],['over_week','More than 7 days ago']])}{field('Pets present?','pets','text',[['no','No'],['yes','Yes']])}{field('Cleaning materials','supplies','text',[['customer','I will provide'],['company','CleanSure should bring supplies']])}<label className="form-field full">Allergies, sensitivities or special instructions<textarea name="notes" rows="3" value={booking.notes} onChange={update}/></label></div>
