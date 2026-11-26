@@ -1,0 +1,10 @@
+<nav aria-label="Cleaning services and areas">
+  <a href="/residential-cleaning.html">Residential cleaning</a>
+  <a href="/deep-cleaning.html">Deep cleaning</a>
+  <a href="/move-in-cleaning.html">Move-in cleaning</a>
+  <a href="/move-out-cleaning.html">Move-out cleaning</a>
+  <a href="/commercial-cleaning.html">Commercial cleaning</a>
+  <a href="/cleaning-services-kitchener.html">Cleaning services in Kitchener</a>
+  <a href="/cleaning-services-waterloo.html">Cleaning services in Waterloo</a>
+  <a href="/cleaning-services-cambridge.html">Cleaning services in Cambridge</a>
+</nav>
