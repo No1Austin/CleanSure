@@ -68,34 +68,8 @@
       }
     </script>
 
-    <!-- Google Analytics 4 -->
-    <script
-      async
-      src="https://www.googletagmanager.com/gtag/js?id=G-68QFPPH0NR"
-    ></script>
-
-    <script>
-      window.dataLayer = window.dataLayer || [];
-
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-
-      gtag('consent', 'default', {
-        analytics_storage: 'denied',
-        ad_storage: 'denied',
-        ad_user_data: 'denied',
-        ad_personalization: 'denied'
-      });
-
-      gtag('js', new Date());
-
-      gtag('config', 'G-68QFPPH0NR', {
-        send_page_view: false,
-        allow_google_signals: false,
-        allow_ad_personalization_signals: false
-      });
-    </script>
+    <link rel="stylesheet" href="/cs-analytics.css" />
+    <script defer src="/cs-analytics.js"></script>
   </head>
 
   <body>
