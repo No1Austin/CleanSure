@@ -35,8 +35,8 @@ function fail(res, error, context) {
 router.get('/overview', async (_req, res) => {
   try {
     const [bookings, cleaners] = await Promise.all([
-      supabase.from('bookings').select('id,booking_code,customer_name,customer_email,customer_phone,address,service,service_date,service_time,hours,cleaners,notes,estimated_total,status,crm_payment_status,crm_tags,crm_assigned_cleaner_id,stripe_paid,assigned_at,customer_started,cleaner_started,customer_completed,cleaner_completed,cleaner_rating,customer_rating,company_rating,created_at').order('created_at', { ascending: false }).limit(500),
-      supabase.from('cleaner_profiles').select('id,cleaner_code,first_name,last_name,email,phone,city,specialty,years_experience,verification_status,auth_user_id,profile_photo_path,crm_tags,created_at').order('created_at', { ascending: false }).limit(500)
+      supabase.from('bookings').select('id,booking_code,customer_name,customer_email,customer_phone,address,service,service_date,service_time,hours,cleaners,notes,estimated_total,cleaner_hourly_rate,status,crm_payment_status,crm_tags,crm_assigned_cleaner_id,stripe_paid,assigned_at,customer_started,cleaner_started,customer_completed,cleaner_completed,cleaner_rating,customer_rating,company_rating,created_at').order('created_at', { ascending: false }).limit(500),
+      supabase.from('cleaner_profiles').select('id,cleaner_code,first_name,last_name,email,phone,city,specialty,years_experience,equipment,equipment_other,verification_status,auth_user_id,profile_photo_path,crm_tags,created_at').order('created_at', { ascending: false }).limit(500)
     ]);
     console.info('CRM overview result', {bookings:bookings.data?.length ?? null,cleaners:cleaners.data?.length ?? null,bookingError:bookings.error?.code||null,cleanerError:cleaners.error?.code||null});
     if (bookings.error) return fail(res, bookings.error, 'load bookings');
@@ -53,6 +53,39 @@ router.get('/overview', async (_req, res) => {
     }
     return res.json({ bookings: bookings.data, cleaners: cleaners.data, customers: [...customerMap.values()], limitedTo: 500 });
   } catch (error) { return fail(res, error, 'load overview'); }
+});
+
+// Permanent deletion is restricted to explicitly labelled, unused test records.
+router.delete('/:kind/:id/test-record', async (req,res)=>{
+ const {kind,id}=req.params;
+ if(!['bookings','cleaners'].includes(kind)||!uuid.safeParse(id).success||req.body?.confirmation!=='DELETE TEST')return res.status(400).json({error:'Invalid deletion request'});
+ try{
+  const table=kind==='bookings'?'bookings':'cleaner_profiles';
+  const fields=kind==='bookings'?'id,crm_tags,stripe_paid,stripe_session,crm_payment_status,status,crm_assigned_cleaner_id':'id,crm_tags,auth_user_id,verification_status,profile_photo_path,invite_token_hash';
+  const lookup=await supabase.from(table).select(fields).eq('id',id).maybeSingle();
+  if(lookup.error)throw lookup.error;
+  const row=lookup.data;
+  if(!row)return res.status(404).json({error:'Record not found'});
+  if(!row.crm_tags?.includes('test'))return res.status(409).json({error:'Add the exact label test before deleting.'});
+  let query=supabase.from(table).delete().eq('id',id).contains('crm_tags',['test']);
+  let paths=[];let bucket;
+  if(kind==='bookings'){
+   if(row.stripe_paid!==false||row.stripe_session||row.crm_payment_status!=='unpaid'||!['requested','pending','cancelled','expired'].includes(row.status)||row.crm_assigned_cleaner_id)return res.status(409).json({error:'Protected booking: payment, checkout session, assignment or active job exists.'});
+   const photos=await supabase.from('booking_photos').select('storage_path').eq('booking_id',id);if(photos.error)throw photos.error;
+   paths=photos.data.map(p=>p.storage_path);bucket='booking-photos';
+   query=query.eq('stripe_paid',false).is('stripe_session',null).eq('crm_payment_status','unpaid').is('crm_assigned_cleaner_id',null).in('status',['requested','pending','cancelled','expired']);
+  }else{
+   if(row.auth_user_id||row.invite_token_hash||row.verification_status==='approved')return res.status(409).json({error:'Protected cleaner: account, invitation or approval exists.'});
+   query=query.is('auth_user_id',null).is('invite_token_hash',null).in('verification_status',['pending','rejected']);
+   paths=row.profile_photo_path?[row.profile_photo_path]:[];bucket='cleaner-profile-photos';
+  }
+  const deleted=await query.select('id').maybeSingle();if(deleted.error)throw deleted.error;
+  if(!deleted.data)return res.status(409).json({error:'Record changed; refresh and retry.'});
+  console.info('CRM test record deleted',{adminId:req.adminId,kind,id});
+  let warning=null;
+  if(paths.length){try{const cleanup=await supabase.storage.from(bucket).remove(paths);if(cleanup.error)throw cleanup.error;}catch(error){console.error('Test record photo cleanup failed',{kind,id,error:error.message});warning='Record deleted, but photo cleanup requires administrator review.';}}
+  return res.json({success:true,warning});
+ }catch(error){return fail(res,error,'delete test record');}
 });
 
 router.get('/cleaners/:id/photo', async (req, res) => {

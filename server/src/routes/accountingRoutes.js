@@ -50,6 +50,10 @@ async function getRecords(req,res,{cleanerId}={}){
  ]);
  if(b.error||c.error)return fail(res,b.error||c.error);
  const bm=new Map(b.data.map(v=>[v.id,v]));const cm=new Map(c.data.map(v=>[v.id,v]));
+ if(cleanerId){
+  const t=totals(rows);
+  return res.json({records:rows.map(r=>({id:r.id,work_date:r.work_date,work_status:r.work_status,scheduled_hours:r.scheduled_hours,approved_hours:r.approved_hours,compensation_mode:r.compensation_mode,hourly_rate_cents:r.hourly_rate_cents,cleaner_earned:r.cleaner_earned,cleaner_payout_status:r.cleaner_payout_status,booking:bm.get(r.booking_id)||null})),totals:{jobs:t.jobs,completedJobs:t.completedJobs,hoursWorked:t.hoursWorked,cleanerEarned:t.cleanerEarned,cleanerPaid:t.cleanerPaid,cleanerUnpaid:t.cleanerUnpaid},period:{from:from||null,to:to||null},limitedTo:2000,source:'admin-recorded'});
+ }
  return res.json({records:rows.map(r=>({...r,booking:bm.get(r.booking_id)||null,cleaner:cm.get(r.cleaner_id)||null})),totals:totals(rows),period:{from:from||null,to:to||null},limitedTo:2000,source:'admin-recorded; not verified against payment processor'});
 }
 router.get('/admin/overview',adminOnly,(req,res)=>getRecords(req,res));
@@ -81,7 +85,7 @@ router.post('/admin/records',adminOnly,async(req,res)=>{
  if(!parsed.success)return res.status(400).json({error:'Invalid work or accounting details',issues:parsed.error.issues.map(x=>x.message)});
  const v=parsed.data;
  const [booking,cleaner]=await Promise.all([
-  supabase.from('bookings').select('id,crm_assigned_cleaner_id').eq('id',v.bookingId).maybeSingle(),
+  supabase.from('bookings').select('id,crm_assigned_cleaner_id,cleaner_hourly_rate').eq('id',v.bookingId).maybeSingle(),
   supabase.from('cleaner_profiles').select('id,verification_status,auth_user_id').eq('id',v.cleanerId).maybeSingle()
  ]);
  if(booking.error||cleaner.error)return fail(res,booking.error||cleaner.error);
@@ -90,6 +94,11 @@ router.post('/admin/records',adminOnly,async(req,res)=>{
  if(booking.data.crm_assigned_cleaner_id!==v.cleanerId)return res.status(409).json({error:'Assign this cleaner to the booking in CRM first'});
  const {data:existing,error:existingError}=await supabase.from('cleaner_work_records').select(select).eq('booking_id',v.bookingId).maybeSingle();
  if(existingError)return fail(res,existingError);
+ if(existing?.cleaner_payout_status!=='paid'&&booking.data.cleaner_hourly_rate!=null){
+  const agreed=Number(booking.data.cleaner_hourly_rate);
+  if(!Number.isFinite(agreed)||agreed<=0)return res.status(409).json({error:'Invalid booked cleaner rate; reconcile before recording compensation.'});
+  if(v.compensationMode!=='hourly'||cents(v.hourlyRate)!==cents(agreed))return res.status(409).json({error:`Use the agreed booking rate of $${agreed.toFixed(2)}/hr for this cleaner.`});
+ }
  if(existing&&existing.cleaner_id!==v.cleanerId)return res.status(409).json({error:'This booking already has a work record for another cleaner. Reassignment requires an audited correction.'});
  if(existing?.customer_payment_status==='paid'&&v.customerPaymentStatus==='unpaid')return res.status(409).json({error:'Recorded payments cannot be reset to unpaid. Reconcile with a refund.'});
  if(existing?.cleaner_payout_status==='paid'&&v.cleanerPayoutStatus==='unpaid')return res.status(409).json({error:'Recorded cleaner payouts cannot be reset to unpaid.'});

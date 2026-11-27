@@ -7,3 +7,5 @@
 .join-disclosures p{margin:6px 0 12px}
 
 .cleaner-portal{min-height:100vh;background:#f3f8f5;display:flex;align-items:flex-start;justify-content:center;padding:5rem 1rem}.cleaner-portal-card{background:white;max-width:720px;width:100%;padding:2rem;border-radius:18px;box-shadow:0 12px 40px #16362618}.cleaner-portal-card h1{margin:2rem 0 1rem}.cleaner-portal-card form{display:grid;gap:1rem}.cleaner-admin-list{display:grid;gap:1rem;margin-top:1rem}.cleaner-admin-list article{padding:1rem;border:1px solid #dbe8df;border-radius:12px}.cleaner-admin-list p{overflow-wrap:anywhere;margin:.4rem 0}
+
+.join-equipment{grid-column:1/-1;min-width:0;border:1px solid #dcebe6;border-radius:12px;padding:14px}.join-equipment legend{font-weight:700}.join-equipment-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin:12px 0}.join-equipment-grid .join-consent{font-weight:400}

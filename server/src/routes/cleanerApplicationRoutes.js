@@ -20,6 +20,8 @@ const schema = z.object({
   location: z.string().trim().min(2).max(120),
   experience: z.coerce.number().int().min(0).max(60),
   specialty: z.enum(['Residential cleaning', 'Deep cleaning', 'Move-in / move-out', 'Commercial cleaning']),
+  equipment: z.string().max(1000).transform((value,ctx)=>{try{return JSON.parse(value)}catch{ctx.addIssue({code:"custom",message:"Invalid equipment"});return z.NEVER}}).pipe(z.array(z.enum(["Face mask / nose mask", "Gloves", "Broom", "Mop and bucket", "Spray bottles", "Vacuum cleaner", "Dustpan", "Microfiber cloths", "Scrubbing brushes", "Cleaning detergents", "Disinfectants", "Sponges", "Protective apron", "Safety goggles"])).max(14)).optional(),
+  equipmentOther: z.string().trim().max(300).optional(),
   consent: z.literal('true'),
   termsAccepted: z.literal('true')
 });
@@ -63,7 +65,7 @@ router.post('/', rateLimit({windowMs:15*60*1000, limit:5, standardHeaders:'draft
     const cleanerId = `${first_name.slice(0,3).toUpperCase().padEnd(3,'X')}${String(randomBytes(4).readUInt32BE(0) % 900000 + 100000)}`;
     const inserted = await supabase.from('cleaner_profiles').insert({
       first_name,last_name,email,phone:applicant.phone,city:applicant.location,
-      years_experience:applicant.experience,specialty:applicant.specialty,profile_photo_path:path,verification_status:'pending',cleaner_code:cleanerId
+      equipment:applicant.equipment ? [...new Set(applicant.equipment)] : null,equipment_other:applicant.equipmentOther || null,years_experience:applicant.experience,specialty:applicant.specialty,profile_photo_path:path,verification_status:'pending',cleaner_code:cleanerId
     }).select('id').single();
     if (inserted.error) {
       if (path) await supabase.storage.from('cleaner-profile-photos').remove([path]);
