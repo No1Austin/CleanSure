@@ -119,3 +119,22 @@ router.post('/admin/bookings/:id/email-sent',auth,requireAdmin,async(req,res)=>{
  return res.json({success:true});
 });
 export default router;
+
+// Recovery uses Supabase's configured SMTP; never generates or exposes passwords.
+const adminEmails=()=> (process.env.CLEANSURE_ADMIN_EMAILS||'').split(',').map(v=>v.trim().toLowerCase()).filter(Boolean);
+async function requestAdminRecovery(req,res){
+ const parsed=z.object({email:z.email().max(254)}).safeParse(req.body);
+ if(!parsed.success)return res.status(400).json({error:'Invalid email'});
+ const email=parsed.data.email.trim().toLowerCase();
+ if(adminEmails().includes(email)){
+  const {error}=await authClient.auth.resetPasswordForEmail(email,{redirectTo:'https://cleansure.ca/?adminPortal=1&adminResetPassword=1'});
+  if(error)console.warn('Admin recovery request failed',error.code||'auth_error');
+ }
+ return res.json({success:true});
+}
+router.post('/admin/forgot-password',limiter,requestAdminRecovery);
+router.post('/admin/send-setup',limiter,auth,requireAdmin,(req,res,next)=>{
+ const owners=(process.env.CLEANSURE_SUPER_ADMIN_EMAILS||'').split(',').map(v=>v.trim().toLowerCase());
+ if(!owners.includes(req.authUser.email?.toLowerCase()))return res.status(403).json({error:'Owner access required'});next();
+},requestAdminRecovery);
+router.get('/admin/recovery-check',limiter,auth,requireAdmin,(_req,res)=>res.json({success:true}));

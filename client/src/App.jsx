@@ -13,7 +13,7 @@ import './cleansure-homepage.css';
 const recoveryClient = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY,
-  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true,
+  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: !new URLSearchParams(window.location.search).has('adminPortal'),
     storageKey: 'cleansure-cleaner-recovery' } }
 );
 const services = [
